@@ -1,0 +1,35 @@
+name: paste_anything_editor
+description: >-
+  Rich text editor for Flutter web that pastes and copies Word, Excel, Google
+  Docs, Markdown, HTML, tables, math formulas and images with formatting kept.
+version: 0.1.0
+repository: https://github.com/2Math0/paste_anything_editor
+issue_tracker: https://github.com/2Math0/paste_anything_editor/issues
+
+topics:
+  - editor
+  - clipboard
+  - html
+  - quill
+  - math
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+# Ranges span a whole major version (or 0.x minor) so apps on different
+# Flutter versions can resolve them; see README "Dependency policy".
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_math_fork: ">=0.7.3 <0.8.0"
+  flutter_quill: ">=11.0.0 <12.0.0"
+  flutter_quill_delta_from_html: ">=1.5.0 <2.0.0"
+  flutter_widget_from_html_core: ">=0.15.1 <1.0.0"
+  html: ">=0.15.4 <1.0.0"
+  markdown: ">=7.1.0 <8.0.0"
+  vsc_quill_delta_to_html: ">=1.0.5 <2.0.0"
+  web: ">=1.0.0 <2.0.0"
+
+dev_dependencies:
+  flutter_lints: ">=4.0.0 <7.0.0"
