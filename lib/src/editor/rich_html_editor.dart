@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../clipboard/rich_clipboard.dart';
 import '../codec/rich_html_codec.dart';
 import '../math/math_formula_embed.dart';
 import '../math/math_input_panel.dart';
+import '../math/math_panel_theme.dart';
 import 'image_embed.dart';
+import 'quill_localizations_scope.dart';
 import 'rich_html_editor_controller.dart';
 import 'table_embed.dart';
 
@@ -29,6 +32,8 @@ class RichHtmlEditor extends StatefulWidget {
     this.showMathButton = true,
     this.onNotify,
     this.embedBuilders = const [],
+    this.mathTheme,
+    this.mathLabels = const MathPanelLabels(),
   });
 
   final RichHtmlEditorController controller;
@@ -52,6 +57,12 @@ class RichHtmlEditor extends StatefulWidget {
 
   /// Extra embed builders, checked after the built-in ones.
   final List<EmbedBuilder> embedBuilders;
+
+  /// Colors / shape of the math dialog opened from this editor (toolbar
+  /// button and formula editing). Falls back to the app-wide
+  /// [MathPanelTheme] extension, then the Material color scheme.
+  final MathPanelTheme? mathTheme;
+  final MathPanelLabels mathLabels;
 
   @override
   State<RichHtmlEditor> createState() => _RichHtmlEditorState();
@@ -105,7 +116,10 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      QuillLocalizationsScope(child: Builder(builder: _buildEditor));
+
+  Widget _buildEditor(BuildContext context) {
     final c = widget.controller;
 
     if (!_scheduledInit) {
@@ -190,7 +204,10 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
                     autoFocus: false,
                     embedBuilders: [
                       const HtmlTableEmbedBuilder(),
-                      const MathFormulaEmbedBuilder(),
+                      MathFormulaEmbedBuilder(
+                        dialogTheme: widget.mathTheme,
+                        dialogLabels: widget.mathLabels,
+                      ),
                       const RichImageEmbedBuilder(),
                       ...widget.embedBuilders,
                     ],
@@ -206,7 +223,11 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
   }
 
   Future<void> _openMath() async {
-    final result = await MathInputDialog.show(context);
+    final result = await MathInputDialog.show(
+      context,
+      theme: widget.mathTheme,
+      labels: widget.mathLabels,
+    );
     if (result == null || !mounted) return;
     switch (result) {
       case MathSymbolInsertion(:final char):
@@ -261,9 +282,9 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
 
   Future<void> _pasteAsPlainText() async {
     try {
-      final data = await Clipboard.getData(Clipboard.kTextPlain);
-      if (data?.text?.isNotEmpty ?? false) {
-        widget.controller.insertText(data!.text!);
+      final text = await readClipboardText();
+      if (text != null && text.isNotEmpty) {
+        widget.controller.insertText(text);
         _notify('Pasted as plain text');
       } else {
         _notify('Nothing to paste', isError: true);

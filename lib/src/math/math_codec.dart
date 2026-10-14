@@ -249,12 +249,15 @@ abstract final class MathCodec {
   /// First formula on the clipboard (HTML first, then delimited or raw text),
   /// or null.
   static Future<String?> readFormulaFromClipboard() async {
-    final html = await readClipboardHtml();
+    final clip = await readClipboard();
+    final html = clip.html;
     if (html != null) {
       final found = formulasFromHtml(html);
       if (found.isNotEmpty) return found.first;
     }
-    final plain = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    final plain = clip.isAvailable
+        ? clip.text
+        : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
     if (plain == null || plain.trim().isEmpty) return null;
     final formulas = <String>[];
     protect(plain, formulas);

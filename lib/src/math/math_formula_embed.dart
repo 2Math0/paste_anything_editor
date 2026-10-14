@@ -3,12 +3,20 @@ import 'package:flutter_quill/flutter_quill.dart';
 
 import 'math_codec.dart';
 import 'math_input_panel.dart';
+import 'math_panel_theme.dart';
 import 'math_view.dart';
 
 /// Inline Quill embed rendering a [MathCodec.embedType] formula.
 /// Tap to edit; the menu copies or removes it.
 class MathFormulaEmbedBuilder extends EmbedBuilder {
-  const MathFormulaEmbedBuilder();
+  const MathFormulaEmbedBuilder({
+    this.dialogTheme,
+    this.dialogLabels = const MathPanelLabels(),
+  });
+
+  /// Styles the edit dialog; see [MathInputDialog.show].
+  final MathPanelTheme? dialogTheme;
+  final MathPanelLabels dialogLabels;
 
   @override
   String get key => MathCodec.embedType;
@@ -29,7 +37,13 @@ class MathFormulaEmbedBuilder extends EmbedBuilder {
     if (embedContext.readOnly) return formula;
 
     Future<void> edit() async {
-      final result = await MathInputDialog.show(context, initialLatex: latex);
+      final result = await MathInputDialog.show(
+        context,
+        initialLatex: latex,
+        theme: dialogTheme,
+        labels: dialogLabels,
+        showSymbolsTab: false,
+      );
       if (result is MathFormulaInsertion) {
         controller.replaceText(
           offset,

@@ -10,15 +10,29 @@ class ClipboardImage {
   final String mimeType;
 }
 
-/// The rich flavors of the system clipboard visible to the app.
+/// The flavors of the system clipboard visible to the app, read in one go.
 class ClipboardSnapshot {
-  const ClipboardSnapshot({this.html, this.image});
+  const ClipboardSnapshot({
+    this.html,
+    this.text,
+    this.image,
+    this.isAvailable = true,
+  });
 
-  static const empty = ClipboardSnapshot();
+  /// Returned when the rich clipboard can't be read (non-web platform,
+  /// permission denied, unsupported browser).
+  static const unavailable = ClipboardSnapshot(isAvailable: false);
 
   /// `text/html` (Word, Excel, Google Docs, web pages, this editor).
   final String? html;
 
+  /// `text/plain`.
+  final String? text;
+
   /// First `image/*` item (screenshots, "Copy image" in a browser).
   final ClipboardImage? image;
+
+  /// False when the clipboard couldn't be read at all; callers should fall
+  /// back to Flutter's plain-text `Clipboard`.
+  final bool isAvailable;
 }

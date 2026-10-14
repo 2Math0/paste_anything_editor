@@ -1,3 +1,24 @@
+## 0.2.0
+
+- Fix: first "paste with formatting" after granting clipboard permission
+  failed with `NotAllowedError: Document is not focused`. HTML, text and
+  images are now read in a single Clipboard API call, and the read is retried
+  once the page regains focus.
+- New `readClipboardText()` and `waitForDocumentFocus()`;
+  `ClipboardSnapshot` now carries `text` and `isAvailable`.
+- Math dialog theming: `MathPanelTheme` (Material `ThemeExtension`, app-wide
+  or per use, `seedColor` / `colorScheme`, every color, radius, size) and
+  `MathPanelLabels` (all texts).
+- `MathInputDialog.show` / `MathInputPanel`: `theme`, `labels`,
+  `symbolGroups`, `templates`, `showSymbolsTab`, `showFormulaTab`.
+- `RichHtmlEditor`: `mathTheme`, `mathLabels`; formula editing opens the
+  formula tab only.
+- Fix: `MissingFlutterQuillLocalizationException` when the app doesn't add
+  `FlutterQuillLocalizations.delegate`; the editor now provides it
+  (`QuillLocalizationsScope`).
+- `example/` is now a standalone Flutter web app (`flutter run -d chrome`).
+- Docs: Flutter 3.44 needs `flutter_quill` >= 11.6.0.
+
 ## 0.1.0
 
 - Initial release.

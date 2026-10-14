@@ -126,11 +126,13 @@ class RichHtmlEditorController {
 
   /// Rich paste from the system clipboard: images, HTML (Word, Excel, Google
   /// Docs, web pages), or plain text that is HTML source, LaTeX or Markdown.
-  /// Returns false to let Quill handle plain text and its own internal
-  /// copy/paste.
+  /// Returns false only to let Quill paste its own internal copy (which keeps
+  /// the Delta) or report that nothing was pasted.
   Future<bool> _handleClipboardPaste() async {
     final clip = await readClipboard();
-    final plain = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    final plain = clip.isAvailable
+        ? clip.text
+        : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
     final html = (clip.html?.trim().isEmpty ?? true) ? null : clip.html!;
     final image = clip.image;
 
@@ -153,9 +155,14 @@ class RichHtmlEditorController {
       return true;
     }
 
-    if (plain == null || plain.isEmpty) return false;
-    if (plain == quillController.pastePlainText) return false;
-    return _pasteSourceText(plain);
+    if (plain == null || plain.isEmpty || plain == quillController.pastePlainText) {
+      // Quill re-reads the clipboard with readText(), which the browser
+      // rejects until the page has focus back from the permission prompt.
+      await waitForDocumentFocus();
+      return false;
+    }
+    if (!_pasteSourceText(plain)) insertText(plain);
+    return true;
   }
 
   bool _pasteSourceText(String text) {

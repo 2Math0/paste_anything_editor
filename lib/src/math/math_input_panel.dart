@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'math_codec.dart';
+import 'math_panel_theme.dart';
 import 'math_symbols.dart';
 import 'math_view.dart';
 
@@ -30,11 +31,30 @@ class MathInputPanel extends StatefulWidget {
     this.initialLatex,
     this.onSymbol,
     this.onFormula,
-  });
+    this.theme,
+    this.labels = const MathPanelLabels(),
+    this.symbolGroups,
+    this.templates,
+    this.showSymbolsTab = true,
+    this.showFormulaTab = true,
+  }) : assert(showSymbolsTab || showFormulaTab);
 
   final String? initialLatex;
   final ValueChanged<String>? onSymbol;
   final ValueChanged<String>? onFormula;
+
+  /// Overrides the app-wide [MathPanelTheme] extension for this panel.
+  final MathPanelTheme? theme;
+  final MathPanelLabels labels;
+
+  /// Defaults to [kMathSymbolGroups].
+  final List<MathSymbolGroup>? symbolGroups;
+
+  /// Defaults to [kMathTemplates].
+  final List<MathTemplate>? templates;
+
+  final bool showSymbolsTab;
+  final bool showFormulaTab;
 
   @override
   State<MathInputPanel> createState() => _MathInputPanelState();
@@ -42,14 +62,18 @@ class MathInputPanel extends StatefulWidget {
 
 class _MathInputPanelState extends State<MathInputPanel>
     with SingleTickerProviderStateMixin {
+  late final bool _bothTabs = widget.showSymbolsTab && widget.showFormulaTab;
   late final TabController _tabs = TabController(
-    length: 2,
+    length: _bothTabs ? 2 : 1,
     vsync: this,
-    initialIndex: widget.initialLatex != null ? 1 : 0,
+    initialIndex: _bothTabs && widget.initialLatex != null ? 1 : 0,
   );
   late final TextEditingController _latex =
       TextEditingController(text: widget.initialLatex ?? '');
   final FocusNode _latexFocus = FocusNode();
+
+  MathPanelLabels get _labels => widget.labels;
+  List<MathSymbolGroup> get _groups => widget.symbolGroups ?? kMathSymbolGroups;
 
   @override
   void dispose() {
@@ -72,13 +96,12 @@ class _MathInputPanelState extends State<MathInputPanel>
       onSymbol(symbol.char);
       return;
     }
-    await MathCodec.copySymbol(symbol.char);
-    _toast('Copied ${symbol.char}');
+    await _copySymbol(symbol);
   }
 
   Future<void> _copySymbol(MathSymbol symbol) async {
     await MathCodec.copySymbol(symbol.char);
-    _toast('Copied ${symbol.char}');
+    _toast('${_labels.copiedPrefix} ${symbol.char}');
   }
 
   void _insertIntoFormula(String snippet) {
@@ -99,7 +122,7 @@ class _MathInputPanelState extends State<MathInputPanel>
   Future<void> _pasteFormula() async {
     final latex = await MathCodec.readFormulaFromClipboard();
     if (latex == null || latex.isEmpty) {
-      _toast('No formula on the clipboard');
+      _toast(_labels.noFormulaOnClipboard);
       return;
     }
     _insertIntoFormula(latex);
@@ -108,26 +131,43 @@ class _MathInputPanelState extends State<MathInputPanel>
   Future<void> _copyFormula() async {
     if (_formula.isEmpty) return;
     await MathCodec.copyFormula(_formula);
-    _toast('Formula copied');
+    _toast(_labels.formulaCopied);
   }
 
   Future<void> _copyLatex() async {
     if (_formula.isEmpty) return;
     await MathCodec.copyLatex(_formula);
-    _toast('LaTeX copied');
+    _toast(_labels.latexCopied);
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = MathPanelTheme.resolve(context, widget.theme);
+    return Theme(
+      data: Theme.of(context).copyWith(colorScheme: t.colorScheme),
+      child: Builder(builder: (context) => _buildContent(context, t)),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, MathPanelTheme t) {
+    if (!_bothTabs) {
+      return widget.showSymbolsTab
+          ? _buildSymbolsTab(context, t)
+          : _buildFormulaTab(context, t);
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TabBar(
           controller: _tabs,
-          tabs: const [
-            Tab(icon: Icon(Icons.grid_view), text: 'Symbols'),
-            Tab(icon: Icon(Icons.functions), text: 'Formula'),
+          indicatorColor: t.tabIndicatorColor,
+          labelColor: t.tabSelectedColor,
+          unselectedLabelColor: t.tabUnselectedColor,
+          dividerColor: t.previewBorderColor,
+          tabs: [
+            Tab(icon: const Icon(Icons.grid_view), text: _labels.symbolsTab),
+            Tab(icon: const Icon(Icons.functions), text: _labels.formulaTab),
           ],
         ),
         const SizedBox(height: 8),
@@ -135,8 +175,8 @@ class _MathInputPanelState extends State<MathInputPanel>
           child: TabBarView(
             controller: _tabs,
             children: [
-              _buildSymbolsTab(),
-              _buildFormulaTab(),
+              _buildSymbolsTab(context, t),
+              _buildFormulaTab(context, t),
             ],
           ),
         ),
@@ -144,17 +184,25 @@ class _MathInputPanelState extends State<MathInputPanel>
     );
   }
 
-  Widget _buildSymbolsTab() {
+  Widget _buildSymbolsTab(BuildContext context, MathPanelTheme t) {
     final hint = widget.onSymbol != null
-        ? 'Tap to insert · long-press to copy'
-        : 'Tap to copy';
+        ? _labels.tapToInsertHint
+        : _labels.tapToCopyHint;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(hint, style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          hint,
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: t.tabUnselectedColor),
+        ),
         const SizedBox(height: 6),
         Expanded(
           child: _SymbolPalette(
+            groups: _groups,
+            theme: t,
             onTap: _onSymbolTap,
             onLongPress: _copySymbol,
           ),
@@ -163,7 +211,11 @@ class _MathInputPanelState extends State<MathInputPanel>
     );
   }
 
-  Widget _buildFormulaTab() {
+  Widget _buildFormulaTab(BuildContext context, MathPanelTheme t) {
+    final chipShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(t.chipBorderRadius!),
+    );
+    final fieldRadius = BorderRadius.circular(t.tileBorderRadius!);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -171,13 +223,17 @@ class _MathInputPanelState extends State<MathInputPanel>
           spacing: 6,
           runSpacing: 6,
           children: [
-            for (final t in kMathTemplates)
+            for (final tpl in widget.templates ?? kMathTemplates)
               Tooltip(
-                message: '${t.tooltip}\n${t.latex}',
+                message: '${tpl.tooltip}\n${tpl.latex}',
                 child: ActionChip(
-                  label: Text(t.label),
+                  label: Text(tpl.label),
                   visualDensity: VisualDensity.compact,
-                  onPressed: () => _insertIntoFormula(t.latex),
+                  backgroundColor: t.templateChipColor,
+                  labelStyle: TextStyle(color: t.templateChipLabelColor),
+                  side: BorderSide.none,
+                  shape: chipShape,
+                  onPressed: () => _insertIntoFormula(tpl.latex),
                 ),
               ),
           ],
@@ -188,13 +244,23 @@ class _MathInputPanelState extends State<MathInputPanel>
           focusNode: _latexFocus,
           minLines: 2,
           maxLines: 4,
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+          style: t.latexTextStyle,
           decoration: InputDecoration(
-            labelText: 'LaTeX',
-            hintText: r'e.g. x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}',
-            border: const OutlineInputBorder(),
+            labelText: _labels.latexLabel,
+            hintText: _labels.latexHint,
+            filled: true,
+            fillColor: t.inputFillColor,
+            border: OutlineInputBorder(borderRadius: fieldRadius),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: fieldRadius,
+              borderSide: BorderSide(color: t.previewBorderColor!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: fieldRadius,
+              borderSide: BorderSide(color: t.actionColor!, width: 2),
+            ),
             suffixIcon: IconButton(
-              tooltip: 'Paste formula',
+              tooltip: _labels.pasteFormula,
               icon: const Icon(Icons.content_paste),
               onPressed: _pasteFormula,
             ),
@@ -205,9 +271,9 @@ class _MathInputPanelState extends State<MathInputPanel>
           constraints: const BoxConstraints(minHeight: 56),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.grey.shade50,
+            border: Border.all(color: t.previewBorderColor!),
+            borderRadius: fieldRadius,
+            color: t.previewBackgroundColor,
           ),
           child: ValueListenableBuilder<TextEditingValue>(
             valueListenable: _latex,
@@ -215,8 +281,8 @@ class _MathInputPanelState extends State<MathInputPanel>
               final latex = MathCodec.normalizeLatex(value.text);
               if (latex.isEmpty) {
                 return Text(
-                  'Preview',
-                  style: TextStyle(color: Colors.grey.shade500),
+                  _labels.preview,
+                  style: TextStyle(color: t.tabUnselectedColor),
                 );
               }
               return SingleChildScrollView(
@@ -224,7 +290,10 @@ class _MathInputPanelState extends State<MathInputPanel>
                 child: MathFormulaView(
                   latex,
                   display: true,
-                  textStyle: const TextStyle(fontSize: 20),
+                  textStyle: TextStyle(
+                    fontSize: t.previewFontSize,
+                    color: t.previewFormulaColor,
+                  ),
                 ),
               );
             },
@@ -233,6 +302,8 @@ class _MathInputPanelState extends State<MathInputPanel>
         const SizedBox(height: 8),
         Expanded(
           child: _SymbolPalette(
+            groups: _groups,
+            theme: t,
             compact: true,
             onTap: (s) => _insertIntoFormula(s.latexOrChar),
           ),
@@ -249,20 +320,24 @@ class _MathInputPanelState extends State<MathInputPanel>
                 TextButton.icon(
                   onPressed: hasFormula ? _copyLatex : null,
                   icon: const Icon(Icons.code, size: 18),
-                  label: const Text('Copy LaTeX'),
+                  label: Text(_labels.copyLatex),
                 ),
                 OutlinedButton.icon(
                   onPressed: hasFormula ? _copyFormula : null,
                   icon: const Icon(Icons.content_copy, size: 18),
-                  label: const Text('Copy formula'),
+                  label: Text(_labels.copyFormula),
                 ),
                 if (widget.onFormula != null)
                   FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: t.actionColor,
+                      foregroundColor: t.actionForegroundColor,
+                    ),
                     onPressed: hasFormula
                         ? () => widget.onFormula!(_formula)
                         : null,
                     icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Insert'),
+                    label: Text(_labels.insert),
                   ),
               ],
             );
@@ -275,11 +350,15 @@ class _MathInputPanelState extends State<MathInputPanel>
 
 class _SymbolPalette extends StatefulWidget {
   const _SymbolPalette({
+    required this.groups,
+    required this.theme,
     required this.onTap,
     this.onLongPress,
     this.compact = false,
   });
 
+  final List<MathSymbolGroup> groups;
+  final MathPanelTheme theme;
   final ValueChanged<MathSymbol> onTap;
   final ValueChanged<MathSymbol>? onLongPress;
   final bool compact;
@@ -293,8 +372,17 @@ class _SymbolPaletteState extends State<_SymbolPalette> {
 
   @override
   Widget build(BuildContext context) {
-    final group = kMathSymbolGroups[_group];
-    final size = widget.compact ? 34.0 : 44.0;
+    final t = widget.theme;
+    final groups = widget.groups;
+    if (groups.isEmpty) return const SizedBox.shrink();
+    final group = groups[_group.clamp(0, groups.length - 1)];
+    final size = widget.compact ? t.compactSymbolTileSize! : t.symbolTileSize!;
+    final fontSize =
+        widget.compact ? t.compactSymbolFontSize! : t.symbolFontSize!;
+    final tileShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(t.tileBorderRadius!),
+      side: BorderSide(color: t.symbolTileBorderColor!),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -302,14 +390,27 @@ class _SymbolPaletteState extends State<_SymbolPalette> {
           height: 36,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: kMathSymbolGroups.length,
+            itemCount: groups.length,
             separatorBuilder: (_, __) => const SizedBox(width: 6),
-            itemBuilder: (_, i) => ChoiceChip(
-              label: Text(kMathSymbolGroups[i].title),
-              visualDensity: VisualDensity.compact,
-              selected: i == _group,
-              onSelected: (_) => setState(() => _group = i),
-            ),
+            itemBuilder: (_, i) {
+              final selected = i == _group;
+              return ChoiceChip(
+                label: Text(groups[i].title),
+                visualDensity: VisualDensity.compact,
+                selected: selected,
+                backgroundColor: t.chipColor,
+                selectedColor: t.chipSelectedColor,
+                checkmarkColor: t.chipSelectedLabelColor,
+                labelStyle: TextStyle(
+                  color: selected ? t.chipSelectedLabelColor : t.chipLabelColor,
+                ),
+                side: BorderSide.none,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(t.chipBorderRadius!),
+                ),
+                onSelected: (_) => setState(() => _group = i),
+              );
+            },
           ),
         ),
         const SizedBox(height: 6),
@@ -326,20 +427,24 @@ class _SymbolPaletteState extends State<_SymbolPalette> {
                     child: SizedBox(
                       width: size,
                       height: size,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+                      child: Material(
+                        color: t.symbolTileColor,
+                        shape: tileShape,
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => widget.onTap(s),
+                          onLongPress: widget.onLongPress == null
+                              ? null
+                              : () => widget.onLongPress!(s),
+                          child: Center(
+                            child: Text(
+                              s.char,
+                              style: TextStyle(
+                                fontSize: fontSize,
+                                color: t.symbolColor,
+                              ),
+                            ),
                           ),
-                        ),
-                        onPressed: () => widget.onTap(s),
-                        onLongPress: widget.onLongPress == null
-                            ? null
-                            : () => widget.onLongPress!(s),
-                        child: Text(
-                          s.char,
-                          style: TextStyle(fontSize: widget.compact ? 16 : 20),
                         ),
                       ),
                     ),
@@ -359,43 +464,79 @@ abstract final class MathInputDialog {
   static Future<MathInsertion?> show(
     BuildContext context, {
     String? initialLatex,
+    MathPanelTheme? theme,
+    MathPanelLabels labels = const MathPanelLabels(),
+    List<MathSymbolGroup>? symbolGroups,
+    List<MathTemplate>? templates,
+    bool showSymbolsTab = true,
+    bool showFormulaTab = true,
+    bool barrierDismissible = true,
+    bool useRootNavigator = true,
   }) {
+    final t = MathPanelTheme.resolve(context, theme);
+    final titleStyle = t.titleTextStyle!;
     return showDialog<MathInsertion>(
       context: context,
+      barrierColor: t.barrierColor,
+      barrierDismissible: barrierDismissible,
+      useRootNavigator: useRootNavigator,
       builder: (ctx) => Dialog(
-        insetPadding: const EdgeInsets.all(24),
+        backgroundColor: t.backgroundColor,
+        surfaceTintColor: Colors.transparent,
+        elevation: t.dialogElevation,
+        insetPadding: t.dialogInsetPadding,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(t.dialogBorderRadius!),
+        ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720, maxHeight: 640),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
+          constraints: BoxConstraints(
+            maxWidth: t.dialogMaxWidth!,
+            maxHeight: t.dialogMaxHeight!,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                color: t.headerColor,
+                padding: const EdgeInsets.fromLTRB(20, 6, 8, 6),
+                child: Row(
                   children: [
-                    Text(
-                      'Math',
-                      style: Theme.of(ctx).textTheme.titleMedium,
+                    Expanded(
+                      child: Text(
+                        labels.title,
+                        style: titleStyle.copyWith(
+                          color: titleStyle.color ?? t.headerForegroundColor,
+                        ),
+                      ),
                     ),
-                    const Spacer(),
                     IconButton(
-                      tooltip: 'Close',
+                      tooltip: labels.close,
+                      color: t.headerForegroundColor,
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
                 ),
-                Expanded(
+              ),
+              Expanded(
+                child: Padding(
+                  padding: t.dialogPadding!,
                   child: MathInputPanel(
                     initialLatex: initialLatex,
-                    onSymbol: (c) =>
-                        Navigator.pop(ctx, MathSymbolInsertion(c)),
+                    theme: theme,
+                    labels: labels,
+                    symbolGroups: symbolGroups,
+                    templates: templates,
+                    showSymbolsTab: showSymbolsTab,
+                    showFormulaTab: showFormulaTab,
+                    onSymbol: (c) => Navigator.pop(ctx, MathSymbolInsertion(c)),
                     onFormula: (l) =>
                         Navigator.pop(ctx, MathFormulaInsertion(l)),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

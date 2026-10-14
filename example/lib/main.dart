@@ -2,7 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:paste_anything_editor/paste_anything_editor.dart';
 
-void main() => runApp(const MaterialApp(home: ExamplePage()));
+void main() {
+  runApp(
+    MaterialApp(
+      theme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        // App-wide math dialog style; per-use `theme:` values override it.
+        extensions: const [MathPanelTheme(dialogBorderRadius: 20)],
+      ),
+      home: const ExamplePage(),
+    ),
+  );
+}
 
 class ExamplePage extends StatefulWidget {
   const ExamplePage({super.key});
@@ -39,13 +50,22 @@ class _ExamplePageState extends State<ExamplePage> {
                 r'\(e^{i\pi}+1=0\)</span></p>',
             height: 400,
             onChanged: (value) => setState(() => html = value ?? ''),
+            mathTheme: const MathPanelTheme(
+              headerColor: Color(0xFF1E3A8A),
+              headerForegroundColor: Colors.white,
+              actionColor: Color(0xFF1E3A8A),
+            ),
+            mathLabels: const MathPanelLabels(title: 'Equations'),
           ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             icon: const Icon(Icons.functions),
             label: const Text('Standalone math dialog'),
             onPressed: () async {
-              final result = await MathInputDialog.show(context);
+              final result = await MathInputDialog.show(
+                context,
+                theme: const MathPanelTheme(seedColor: Colors.teal),
+              );
               switch (result) {
                 case MathSymbolInsertion(:final char):
                   await MathCodec.copySymbol(char);
