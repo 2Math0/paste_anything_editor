@@ -1,172 +1,20 @@
-# paste_anything_editor
+# Paste Anything
 
-A rich text editor for **Flutter web** that keeps formatting when you copy
-and paste from Word, Excel, Google Docs, web pages, Markdown, tables, math
-formulas and images.
+Copy and paste rich content on the web (Word, Excel, Google Docs, web pages,
+Markdown, LaTeX formulas and images) without losing formatting.
 
-It is built on [flutter_quill](https://pub.dev/packages/flutter_quill) and
-works with plain HTML strings: load HTML in, get HTML out.
+| Package | Use it when |
+| --- | --- |
+| [paste_anything](packages/paste_anything) | You have your own editor and only need the copy-paste logic. Pure Dart, no Flutter. |
+| [paste_anything_editor](packages/paste_anything_editor) | You want a ready-made Flutter web editor with a math keyboard. Built on `paste_anything`. |
 
-> Web only. Rich copy/paste uses the browser Clipboard API.
+## Development
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/2Math0/paste_anything_editor/master/doc/images/math_keyboard.png" alt="Editor with pasted formulas, HTML preview and the docked math keyboard showing formula templates" width="720">
-</p>
-
-## Features
-
-- **Paste with formatting** (Ctrl/Cmd+V or the paste button): bold, italic,
-  underline, colors, fonts, headings, lists, links and tables from Word,
-  Excel, Google Docs, web pages, HTML source and Markdown.
-- **Copy with formatting**: other editors receive formatted HTML.
-- **Math**: a docked math keyboard with symbols and formula templates, LaTeX
-  formulas rendered as equations, and paste from KaTeX, MathJax, MathML or
-  `$...$` text.
-- **Images** (opt-in): screenshots, "Copy image" and images inside pasted
-  HTML.
-
-## Install
+This repository is a [pub workspace](https://dart.dev/tools/pub/workspaces):
 
 ```sh
-flutter pub add paste_anything_editor
+flutter pub get                       # resolves every package at once
+cd packages/paste_anything_editor/example && flutter run -d chrome
 ```
 
-A runnable demo lives in [`example/`](example/):
-
-```sh
-cd example && flutter run -d chrome
-```
-
-## Quick start
-
-```dart
-import 'package:paste_anything_editor/paste_anything_editor.dart';
-
-final controller = RichHtmlEditorController();
-
-RichHtmlEditor(
-  controller: controller,
-  initialText: '<p>Hello</p>',
-  onChanged: (html) => print(html),
-);
-
-final html = await controller.getText(); // save
-controller.setText(html);                // load
-```
-
-## Math keyboard
-
-The **∑** toolbar button opens a math keyboard docked at the bottom of the
-screen. The editor keeps focus, so you can click anywhere in the text to move
-the cursor and keep tapping symbols, like an on-screen keyboard.
-
-- Symbol tabs insert Unicode characters (operators, Greek, sets, arrows, ...).
-- The **Formulas** tab inserts LaTeX templates such as fractions and roots.
-  Click an inserted formula to edit it.
-- **LaTeX editor** opens a dialog to type any formula with a live preview.
-- Press **∑** again, or the hide button, to close it.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/2Math0/paste_anything_editor/master/doc/images/latex_editor.png" alt="LaTeX editor dialog with formula templates, live preview and symbol palette" width="560">
-</p>
-
-Prefer a modal dialog instead?
-
-```dart
-RichHtmlEditor(
-  controller: controller,
-  mathInputMode: MathInputMode.dialog,
-);
-```
-
-Formulas are saved as
-`<span class="math-tex" data-latex="...">\(...\)</span>`, which KaTeX and
-MathJax can render. To show saved HTML with formulas in `HtmlWidget`:
-
-```dart
-HtmlWidget(html, customWidgetBuilder: mathHtmlWidgetBuilder);
-```
-
-## Images
-
-Pasted images are dropped unless you allow them.
-
-```dart
-// Keep images inline as base64 data: URIs.
-RichHtmlEditorController(allowImagePaste: true);
-
-// Or upload them and store the returned URL (return null to drop).
-RichHtmlEditorController(
-  allowImagePaste: true,
-  onImagePaste: (bytes, mimeType) => uploadAndGetUrl(bytes, mimeType),
-);
-```
-
-## Customize math colors and texts
-
-By default the keyboard and dialog follow your app's Material `ColorScheme`.
-Set a `MathPanelTheme` app-wide:
-
-```dart
-MaterialApp(
-  theme: ThemeData(
-    extensions: const [MathPanelTheme(seedColor: Colors.teal)],
-  ),
-);
-```
-
-or for one editor, together with your own texts:
-
-```dart
-RichHtmlEditor(
-  controller: controller,
-  mathTheme: const MathPanelTheme(
-    headerColor: Color(0xFF1E3A8A),
-    headerForegroundColor: Colors.white,
-    keyboardHeight: 320,
-  ),
-  mathLabels: const MathPanelLabels(
-    title: 'Equations',
-    keyboardTitle: 'Equations',
-  ),
-);
-```
-
-Every color, radius and size is optional; unset values fall back to the
-theme. The screenshot above uses exactly this navy header and the
-`'Equations'` title.
-
-## Math without the editor
-
-Use the pieces on their own:
-
-```dart
-// Docked keyboard in your own layout.
-MathKeyboard(onSymbol: (char) => ..., onFormula: (latex) => ...);
-
-// Modal dialog.
-final result = await MathInputDialog.show(context);
-switch (result) {
-  case MathSymbolInsertion(:final char): ...
-  case MathFormulaInsertion(:final latex): ...
-  case null: break;
-}
-
-// Render a formula.
-MathFormulaView(r'\frac{a}{b}');
-```
-
-## Good to know
-
-- The first rich paste shows the browser's clipboard permission prompt. The
-  editor waits for the page to regain focus and then pastes.
-- Word's local `file:///` images can't be read by a browser. Remote images
-  need CORS to display.
-- Needs Flutter 3.27 or newer. On Flutter 3.44 or newer, `flutter_quill`
-  must be 11.6.0 or newer (`flutter pub upgrade flutter_quill`).
-- `flutter_math_fork` 0.7.4 needs Flutter 3.35 or newer. On older Flutter,
-  pin `flutter_math_fork: 0.7.3` in your app.
-
-## License
-
-MIT, see [LICENSE](LICENSE).
+Publish `paste_anything` before `paste_anything_editor` when both change.

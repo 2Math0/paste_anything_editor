@@ -1,45 +1,11 @@
-name: paste_anything_editor
-description: >-
-  Rich text editor for Flutter web that pastes and copies Word, Excel, Google
-  Docs, Markdown, HTML, tables, math formulas and images with formatting kept.
-version: 0.3.0
-repository: https://github.com/2Math0/paste_anything_editor
-issue_tracker: https://github.com/2Math0/paste_anything_editor/issues
-
-# Web only: the clipboard features use the browser Clipboard API.
-platforms:
-  web:
-
-screenshots:
-  - description: Editor with the docked math keyboard and formula templates.
-    path: doc/images/math_keyboard.png
-  - description: LaTeX editor with formula templates, live preview and symbol palette.
-    path: doc/images/latex_editor.png
-
-topics:
-  - editor
-  - clipboard
-  - html
-  - quill
-  - math
+name: pae_workspace
+description: Workspace for paste_anything and paste_anything_editor.
+publish_to: none
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
-  flutter: ">=3.27.0"
 
-# Ranges span a whole major version (or 0.x minor) so apps on different
-# Flutter versions can resolve them; see README "Dependency policy".
-dependencies:
-  flutter:
-    sdk: flutter
-  flutter_math_fork: ">=0.7.3 <0.8.0"
-  flutter_quill: ">=11.0.0 <12.0.0"
-  flutter_quill_delta_from_html: ">=1.5.0 <2.0.0"
-  flutter_widget_from_html_core: ">=0.15.1 <1.0.0"
-  html: ">=0.15.4 <1.0.0"
-  markdown: ">=7.1.0 <8.0.0"
-  vsc_quill_delta_to_html: ">=1.0.5 <2.0.0"
-  web: ">=1.0.0 <2.0.0"
-
-dev_dependencies:
-  flutter_lints: ">=4.0.0 <7.0.0"
+workspace:
+  - packages/paste_anything
+  - packages/paste_anything_editor
+  - packages/paste_anything_editor/example
