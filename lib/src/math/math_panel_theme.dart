@@ -160,7 +160,7 @@ class MathPanelTheme extends ThemeExtension<MathPanelTheme> {
       symbolFontSize: 20,
       compactSymbolFontSize: 16,
       previewFontSize: 20,
-      keyboardHeight: 280,
+      keyboardHeight: 240,
       keyboardMaxWidth: 1200,
       keyboardBorderRadius: 20,
     );

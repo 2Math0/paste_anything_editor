@@ -10,6 +10,10 @@ issue_tracker: https://github.com/2Math0/paste_anything_editor/issues
 platforms:
   web:
 
+screenshots:
+  - description: LaTeX editor with formula templates, live preview and symbol palette.
+    path: doc/images/latex_editor.png
+
 topics:
   - editor
   - clipboard

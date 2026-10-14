@@ -75,7 +75,7 @@ class RichHtmlEditor extends StatefulWidget {
 
 class _RichHtmlEditorState extends State<RichHtmlEditor> {
   bool _scheduledInit = false;
-  OverlayEntry? _mathKeyboard;
+  final _mathKeyboard = OverlayPortalController();
 
   @override
   void initState() {
@@ -90,22 +90,11 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
       oldWidget.controller.quillController.removeListener(_emitChange);
       widget.controller.quillController.addListener(_emitChange);
     }
-    _mathKeyboard?.markNeedsBuild();
   }
 
   @override
   void dispose() {
     widget.controller.quillController.removeListener(_emitChange);
-    final keyboard = _mathKeyboard;
-    _mathKeyboard = null;
-    if (keyboard != null) {
-      // The overlay can't be rebuilt while the tree is being finalized.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        keyboard
-          ..remove()
-          ..dispose();
-      });
-    }
     super.dispose();
   }
 
@@ -133,8 +122,34 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      QuillLocalizationsScope(child: Builder(builder: _buildEditor));
+  Widget build(BuildContext context) => OverlayPortal(
+        controller: _mathKeyboard,
+        overlayChildBuilder: _buildMathKeyboard,
+        child: QuillLocalizationsScope(child: Builder(builder: _buildEditor)),
+      );
+
+  Widget _buildMathKeyboard(BuildContext context) => Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 1, end: 0),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          builder: (_, dy, child) => FractionalTranslation(
+            translation: Offset(0, dy),
+            child: child,
+          ),
+          child: MathKeyboard(
+            theme: widget.mathTheme,
+            labels: widget.mathLabels,
+            onSymbol: (char) => _insertMath(MathSymbolInsertion(char)),
+            onFormula: (latex) => _insertMath(MathFormulaInsertion(latex)),
+            onOpenLatexEditor: () => _openMath(formulaOnly: true),
+            onClose: _mathKeyboard.hide,
+          ),
+        ),
+      );
 
   Widget _buildEditor(BuildContext context) {
     final c = widget.controller;
@@ -242,54 +257,10 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
   void _onMathButton() {
     if (widget.mathInputMode == MathInputMode.dialog) {
       _openMath();
-    } else if (_mathKeyboard == null) {
-      _showMathKeyboard();
-    } else {
-      _hideMathKeyboard();
+      return;
     }
-  }
-
-  void _showMathKeyboard() {
-    final overlay = Overlay.of(context, rootOverlay: true);
-    final themes = InheritedTheme.capture(from: context, to: overlay.context);
-    final entry = OverlayEntry(
-      builder: (_) => Positioned(
-        left: 0,
-        right: 0,
-        bottom: 0,
-        child: themes.wrap(
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 1, end: 0),
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            builder: (_, dy, child) => FractionalTranslation(
-              translation: Offset(0, dy),
-              child: child,
-            ),
-            child: MathKeyboard(
-              theme: widget.mathTheme,
-              labels: widget.mathLabels,
-              onSymbol: (char) => _insertMath(MathSymbolInsertion(char)),
-              onFormula: (latex) => _insertMath(MathFormulaInsertion(latex)),
-              onOpenLatexEditor: () => _openMath(formulaOnly: true),
-              onClose: _hideMathKeyboard,
-            ),
-          ),
-        ),
-      ),
-    );
-    overlay.insert(entry);
-    _mathKeyboard = entry;
-    _keepEditorFocused();
-  }
-
-  void _hideMathKeyboard() {
-    final keyboard = _mathKeyboard;
-    if (keyboard == null) return;
-    keyboard
-      ..remove()
-      ..dispose();
-    _mathKeyboard = null;
+    _mathKeyboard.toggle();
+    if (_mathKeyboard.isShowing) _keepEditorFocused();
   }
 
   Future<void> _openMath({bool formulaOnly = false}) async {

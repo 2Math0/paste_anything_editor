@@ -9,6 +9,7 @@ works with plain HTML strings: load HTML in, get HTML out.
 
 > Web only. Rich copy/paste uses the browser Clipboard API.
 
+
 ## Features
 
 - **Paste with formatting** (Ctrl/Cmd+V or the paste button): bold, italic,
@@ -61,6 +62,10 @@ the cursor and keep tapping symbols, like an on-screen keyboard.
   Click an inserted formula to edit it.
 - **LaTeX editor** opens a dialog to type any formula with a live preview.
 - Press **∑** again, or the hide button, to close it.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/2Math0/paste_anything_editor/master/doc/images/latex_editor.png" alt="LaTeX editor dialog with formula templates, live preview and symbol palette" width="560">
+</p>
 
 Prefer a modal dialog instead?
 
@@ -115,14 +120,18 @@ RichHtmlEditor(
   mathTheme: const MathPanelTheme(
     headerColor: Color(0xFF1E3A8A),
     headerForegroundColor: Colors.white,
-    keyboardHeight: 240,
+    keyboardHeight: 320,
   ),
-  mathLabels: const MathPanelLabels(keyboardTitle: 'Equations'),
+  mathLabels: const MathPanelLabels(
+    title: 'Equations',
+    keyboardTitle: 'Equations',
+  ),
 );
 ```
 
 Every color, radius and size is optional; unset values fall back to the
-theme.
+theme. The screenshot above uses exactly this navy header and the
+`'Equations'` title.
 
 ## Math without the editor
 
