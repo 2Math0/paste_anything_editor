@@ -1,3 +1,17 @@
+## 0.3.0
+
+- Math keyboard: the toolbar math button now opens a docked `MathKeyboard`
+  at the bottom of the screen. The editor keeps focus, so you can move the
+  cursor and keep tapping symbols or formula templates. Toggle it with the
+  same button or hide it from its header.
+- `RichHtmlEditor.mathInputMode`: `MathInputMode.keyboard` (default) or
+  `MathInputMode.dialog` (previous behavior).
+- `MathPanelTheme`: `keyboardHeight`, `keyboardMaxWidth`,
+  `keyboardBorderRadius`. `MathPanelLabels`: `toolbarTooltip`,
+  `keyboardTitle`, `formulasCategory`, `openLatexEditor`, `hideKeyboard`.
+- The package is now declared web-only on pub.dev.
+- Simpler README.
+
 ## 0.2.0
 
 - Fix: first "paste with formatting" after granting clipboard permission

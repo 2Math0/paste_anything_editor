@@ -50,6 +50,9 @@ class MathPanelTheme extends ThemeExtension<MathPanelTheme> {
     this.symbolFontSize,
     this.compactSymbolFontSize,
     this.previewFontSize,
+    this.keyboardHeight,
+    this.keyboardMaxWidth,
+    this.keyboardBorderRadius,
   });
 
   /// Generates the [ColorScheme] when [colorScheme] is not given.
@@ -107,6 +110,11 @@ class MathPanelTheme extends ThemeExtension<MathPanelTheme> {
   final double? compactSymbolFontSize;
   final double? previewFontSize;
 
+  /// [MathKeyboard] height, max content width and top corner radius.
+  final double? keyboardHeight;
+  final double? keyboardMaxWidth;
+  final double? keyboardBorderRadius;
+
   /// Fully populated defaults derived from [scheme].
   factory MathPanelTheme.fallback(ColorScheme scheme) {
     return MathPanelTheme(
@@ -152,6 +160,9 @@ class MathPanelTheme extends ThemeExtension<MathPanelTheme> {
       symbolFontSize: 20,
       compactSymbolFontSize: 16,
       previewFontSize: 20,
+      keyboardHeight: 280,
+      keyboardMaxWidth: 1200,
+      keyboardBorderRadius: 20,
     );
   }
 
@@ -215,6 +226,9 @@ class MathPanelTheme extends ThemeExtension<MathPanelTheme> {
       symbolFontSize: other.symbolFontSize,
       compactSymbolFontSize: other.compactSymbolFontSize,
       previewFontSize: other.previewFontSize,
+      keyboardHeight: other.keyboardHeight,
+      keyboardMaxWidth: other.keyboardMaxWidth,
+      keyboardBorderRadius: other.keyboardBorderRadius,
     );
   }
 
@@ -259,6 +273,9 @@ class MathPanelTheme extends ThemeExtension<MathPanelTheme> {
     double? symbolFontSize,
     double? compactSymbolFontSize,
     double? previewFontSize,
+    double? keyboardHeight,
+    double? keyboardMaxWidth,
+    double? keyboardBorderRadius,
   }) {
     return MathPanelTheme(
       seedColor: seedColor ?? this.seedColor,
@@ -308,6 +325,9 @@ class MathPanelTheme extends ThemeExtension<MathPanelTheme> {
       compactSymbolFontSize:
           compactSymbolFontSize ?? this.compactSymbolFontSize,
       previewFontSize: previewFontSize ?? this.previewFontSize,
+      keyboardHeight: keyboardHeight ?? this.keyboardHeight,
+      keyboardMaxWidth: keyboardMaxWidth ?? this.keyboardMaxWidth,
+      keyboardBorderRadius: keyboardBorderRadius ?? this.keyboardBorderRadius,
     );
   }
 
@@ -365,6 +385,10 @@ class MathPanelTheme extends ThemeExtension<MathPanelTheme> {
       compactSymbolFontSize:
           d(compactSymbolFontSize, other.compactSymbolFontSize),
       previewFontSize: d(previewFontSize, other.previewFontSize),
+      keyboardHeight: d(keyboardHeight, other.keyboardHeight),
+      keyboardMaxWidth: d(keyboardMaxWidth, other.keyboardMaxWidth),
+      keyboardBorderRadius:
+          d(keyboardBorderRadius, other.keyboardBorderRadius),
     );
   }
 }
@@ -391,6 +415,11 @@ class MathPanelLabels {
     this.formulaCopied = 'Formula copied',
     this.latexCopied = 'LaTeX copied',
     this.noFormulaOnClipboard = 'No formula on the clipboard',
+    this.toolbarTooltip = 'Math symbols & formulas',
+    this.keyboardTitle = 'Math',
+    this.formulasCategory = 'Formulas',
+    this.openLatexEditor = 'LaTeX editor',
+    this.hideKeyboard = 'Hide math keyboard',
   });
 
   final String title;
@@ -412,4 +441,13 @@ class MathPanelLabels {
   final String formulaCopied;
   final String latexCopied;
   final String noFormulaOnClipboard;
+
+  /// Editor toolbar button.
+  final String toolbarTooltip;
+
+  /// [MathKeyboard] texts.
+  final String keyboardTitle;
+  final String formulasCategory;
+  final String openLatexEditor;
+  final String hideKeyboard;
 }

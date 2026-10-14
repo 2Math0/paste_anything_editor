@@ -13,6 +13,7 @@ export 'src/editor/table_embed.dart';
 export 'src/math/math_codec.dart';
 export 'src/math/math_formula_embed.dart';
 export 'src/math/math_input_panel.dart';
+export 'src/math/math_keyboard.dart';
 export 'src/math/math_panel_theme.dart';
 export 'src/math/math_symbols.dart';
 export 'src/math/math_view.dart';

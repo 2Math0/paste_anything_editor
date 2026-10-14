@@ -7,7 +7,7 @@ void main() {
     MaterialApp(
       theme: ThemeData(
         colorSchemeSeed: Colors.indigo,
-        // App-wide math dialog style; per-use `theme:` values override it.
+        // App-wide math keyboard/dialog style; per-use `theme:` overrides it.
         extensions: const [MathPanelTheme(dialogBorderRadius: 20)],
       ),
       home: const ExamplePage(),
@@ -41,7 +41,8 @@ class _ExamplePageState extends State<ExamplePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('paste_anything_editor')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        // Room to scroll content above the docked math keyboard.
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 320),
         children: [
           RichHtmlEditor(
             controller: controller,
@@ -55,7 +56,10 @@ class _ExamplePageState extends State<ExamplePage> {
               headerForegroundColor: Colors.white,
               actionColor: Color(0xFF1E3A8A),
             ),
-            mathLabels: const MathPanelLabels(title: 'Equations'),
+            mathLabels: const MathPanelLabels(
+              title: 'Equations',
+              keyboardTitle: 'Equations',
+            ),
           ),
           const SizedBox(height: 24),
           OutlinedButton.icon(

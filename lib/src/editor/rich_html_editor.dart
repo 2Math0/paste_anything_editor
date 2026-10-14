@@ -6,6 +6,7 @@ import '../clipboard/rich_clipboard.dart';
 import '../codec/rich_html_codec.dart';
 import '../math/math_formula_embed.dart';
 import '../math/math_input_panel.dart';
+import '../math/math_keyboard.dart';
 import '../math/math_panel_theme.dart';
 import 'image_embed.dart';
 import 'quill_localizations_scope.dart';
@@ -30,6 +31,7 @@ class RichHtmlEditor extends StatefulWidget {
     this.showContentLabel = true,
     this.contentLabel = 'Content',
     this.showMathButton = true,
+    this.mathInputMode = MathInputMode.keyboard,
     this.onNotify,
     this.embedBuilders = const [],
     this.mathTheme,
@@ -52,14 +54,17 @@ class RichHtmlEditor extends StatefulWidget {
   /// Adds the math symbols & formulas button to the toolbar.
   final bool showMathButton;
 
+  /// What the math button opens: a docked [MathKeyboard] that keeps the
+  /// editor focused (default), or a modal [MathInputDialog].
+  final MathInputMode mathInputMode;
+
   /// Copy/paste feedback. Defaults to a [SnackBar].
   final RichEditorNotifier? onNotify;
 
   /// Extra embed builders, checked after the built-in ones.
   final List<EmbedBuilder> embedBuilders;
 
-  /// Colors / shape of the math dialog opened from this editor (toolbar
-  /// button and formula editing). Falls back to the app-wide
+  /// Colors / shape of the math keyboard and dialog opened from this editor. Falls back to the app-wide
   /// [MathPanelTheme] extension, then the Material color scheme.
   final MathPanelTheme? mathTheme;
   final MathPanelLabels mathLabels;
@@ -70,6 +75,7 @@ class RichHtmlEditor extends StatefulWidget {
 
 class _RichHtmlEditorState extends State<RichHtmlEditor> {
   bool _scheduledInit = false;
+  OverlayEntry? _mathKeyboard;
 
   @override
   void initState() {
@@ -84,11 +90,22 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
       oldWidget.controller.quillController.removeListener(_emitChange);
       widget.controller.quillController.addListener(_emitChange);
     }
+    _mathKeyboard?.markNeedsBuild();
   }
 
   @override
   void dispose() {
     widget.controller.quillController.removeListener(_emitChange);
+    final keyboard = _mathKeyboard;
+    _mathKeyboard = null;
+    if (keyboard != null) {
+      // The overlay can't be rebuilt while the tree is being finalized.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        keyboard
+          ..remove()
+          ..dispose();
+      });
+    }
     super.dispose();
   }
 
@@ -184,8 +201,8 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
                       if (widget.showMathButton)
                         QuillToolbarCustomButtonOptions(
                           icon: const Icon(Icons.functions),
-                          tooltip: 'Math symbols & formulas',
-                          onPressed: _openMath,
+                          tooltip: widget.mathLabels.toolbarTooltip,
+                          onPressed: _onMathButton,
                         ),
                     ],
                   ),
@@ -222,20 +239,83 @@ class _RichHtmlEditorState extends State<RichHtmlEditor> {
     );
   }
 
-  Future<void> _openMath() async {
+  void _onMathButton() {
+    if (widget.mathInputMode == MathInputMode.dialog) {
+      _openMath();
+    } else if (_mathKeyboard == null) {
+      _showMathKeyboard();
+    } else {
+      _hideMathKeyboard();
+    }
+  }
+
+  void _showMathKeyboard() {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final themes = InheritedTheme.capture(from: context, to: overlay.context);
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: themes.wrap(
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 1, end: 0),
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            builder: (_, dy, child) => FractionalTranslation(
+              translation: Offset(0, dy),
+              child: child,
+            ),
+            child: MathKeyboard(
+              theme: widget.mathTheme,
+              labels: widget.mathLabels,
+              onSymbol: (char) => _insertMath(MathSymbolInsertion(char)),
+              onFormula: (latex) => _insertMath(MathFormulaInsertion(latex)),
+              onOpenLatexEditor: () => _openMath(formulaOnly: true),
+              onClose: _hideMathKeyboard,
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(entry);
+    _mathKeyboard = entry;
+    _keepEditorFocused();
+  }
+
+  void _hideMathKeyboard() {
+    final keyboard = _mathKeyboard;
+    if (keyboard == null) return;
+    keyboard
+      ..remove()
+      ..dispose();
+    _mathKeyboard = null;
+  }
+
+  Future<void> _openMath({bool formulaOnly = false}) async {
     final result = await MathInputDialog.show(
       context,
       theme: widget.mathTheme,
       labels: widget.mathLabels,
+      showSymbolsTab: !formulaOnly,
     );
     if (result == null || !mounted) return;
-    switch (result) {
+    _insertMath(result);
+  }
+
+  void _insertMath(MathInsertion insertion) {
+    switch (insertion) {
       case MathSymbolInsertion(:final char):
         widget.controller.insertText(char);
       case MathFormulaInsertion(:final latex):
         widget.controller.insertFormula(latex);
     }
-    widget.controller.editorFocusNode.requestFocus();
+    _keepEditorFocused();
+  }
+
+  void _keepEditorFocused() {
+    final focus = widget.controller.editorFocusNode;
+    if (!focus.hasFocus) focus.requestFocus();
   }
 
   Future<void> _copyWithFormatting() async {
