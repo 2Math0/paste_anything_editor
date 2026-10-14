@@ -9,6 +9,9 @@ works with plain HTML strings: load HTML in, get HTML out.
 
 > Web only. Rich copy/paste uses the browser Clipboard API.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/2Math0/paste_anything_editor/master/doc/images/math_keyboard.png" alt="Editor with pasted formulas, HTML preview and the docked math keyboard showing formula templates" width="720">
+</p>
 
 ## Features
 
