@@ -11,6 +11,8 @@ export 'src/codec/pae_quill_codec.dart';
 export 'src/deprecated.dart';
 export 'src/editor/pae_editor.dart';
 export 'src/editor/pae_editor_controller.dart';
+export 'src/editor/pae_editor_theme.dart';
+export 'src/editor/pae_quill_controller.dart';
 export 'src/editor/pae_image_embed.dart';
 export 'src/editor/pae_quill_localizations_scope.dart';
 export 'src/editor/pae_table_embed.dart';

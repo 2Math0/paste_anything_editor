@@ -3,7 +3,7 @@ description: >-
   Copy and paste rich content on the web: reads Word, Excel, Google Docs,
   web pages, Markdown, LaTeX and images from the clipboard as clean HTML.
   Pure Dart, works with any editor.
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/2Math0/paste_anything_editor/tree/master/packages/paste_anything
 issue_tracker: https://github.com/2Math0/paste_anything_editor/issues
 resolution: workspace
@@ -31,3 +31,4 @@ dependencies:
 
 dev_dependencies:
   lints: ">=4.0.0 <7.0.0"
+  test: ">=1.25.0 <2.0.0"

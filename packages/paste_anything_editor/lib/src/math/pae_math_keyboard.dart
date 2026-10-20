@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'pae_math_theme.dart';
 import 'pae_math_symbols.dart';
-import 'pae_math_view.dart';
 
 /// How the editor's math toolbar button opens math input.
 enum PaeMathInputMode {
@@ -206,13 +205,13 @@ class _PaeMathKeyboardState extends State<PaeMathKeyboard> {
             theme: t,
             height: t.symbolTileSize! * 1.4,
             minWidth: t.symbolTileSize! * 1.6,
-            tooltip: '${tpl.label}\n${tpl.latex}',
+            tooltip: '${tpl.tooltip}\n${tpl.latex}',
             onTap: () => widget.onFormula!(tpl.latex),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: PaeMathView(
-                tpl.latex,
-                textStyle: TextStyle(
+              child: Text(
+                tpl.label,
+                style: TextStyle(
                   fontSize: t.compactSymbolFontSize,
                   color: t.symbolColor,
                 ),

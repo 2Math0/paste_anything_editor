@@ -135,15 +135,23 @@ abstract final class MathCodec {
 
   static String normalizeLatex(String text) => PaeMath.normalizeLatex(text);
   static bool containsLatex(String text) => PaeMath.containsLatex(text);
-  static String protect(String text, List<String> formulas) =>
-      PaeMath.protect(text, formulas);
+  static String protect(String text, List<String> formulas) {
+    final snippets = <PaeMathSnippet>[];
+    final out = PaeMath.protect(text, snippets);
+    formulas.addAll(snippets.map((s) => s.latex));
+    return out;
+  }
+
   static String restorePlaceholders(String html, List<String> formulas) =>
-      PaeMath.restorePlaceholders(html, formulas);
+      PaeMath.restorePlaceholders(
+        html,
+        formulas.map(PaeMathSnippet.new).toList(),
+      );
   static String plainTextToHtml(String text) => PaeHtml.fromPlainText(text);
   static String formulaToHtml(String latex) => PaeMath.formulaToHtml(latex);
   static String? latexOf(dom.Element el) => PaeMath.latexOf(el);
   static List<String> extractFormulas(dom.Element root) =>
-      PaeMath.extractFormulas(root);
+      PaeMath.extractFormulas(root).map((s) => s.latex).toList();
   static List<String> formulasFromHtml(String html) =>
       PaeMath.formulasFromHtml(html);
   static Future<void> copySymbol(String char) => PaeClipboard.writeText(char);

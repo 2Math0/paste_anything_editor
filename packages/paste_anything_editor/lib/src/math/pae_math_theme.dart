@@ -8,6 +8,26 @@ import 'package:flutter/material.dart';
 /// (or one generated from [seedColor]), so the panel matches Material 3 out
 /// of the box. Set it app-wide with `ThemeData(extensions: [PaeMathTheme(...)])`
 /// and/or per use via the `theme:` parameter; per-use values win.
+///
+/// Shape / chrome example:
+/// ```dart
+/// Theme(
+///   data: Theme.of(context).copyWith(
+///     extensions: [
+///       PaeMathTheme(
+///         dialogBorderRadius: 16,
+///         dialogShape: RoundedRectangleBorder(
+///           borderRadius: BorderRadius.circular(16),
+///           side: BorderSide(color: Colors.black12),
+///         ),
+///         dialogElevation: 10,
+///         dialogMaxWidth: 640,
+///       ),
+///     ],
+///   ),
+///   child: child,
+/// )
+/// ```
 @immutable
 class PaeMathTheme extends ThemeExtension<PaeMathTheme> {
   const PaeMathTheme({
@@ -45,6 +65,13 @@ class PaeMathTheme extends ThemeExtension<PaeMathTheme> {
     this.dialogMaxHeight,
     this.dialogPadding,
     this.dialogInsetPadding,
+    this.dialogShape,
+    this.dialogBorderSide,
+    this.dialogShadowColor,
+    this.dialogClipBehavior,
+    this.headerPadding,
+    this.showHeaderIcon,
+    this.previewMinHeight,
     this.symbolTileSize,
     this.compactSymbolTileSize,
     this.symbolFontSize,
@@ -104,6 +131,26 @@ class PaeMathTheme extends ThemeExtension<PaeMathTheme> {
   final EdgeInsets? dialogPadding;
   final EdgeInsets? dialogInsetPadding;
 
+  /// Full [ShapeBorder] for the dialog shell. When null, a
+  /// [RoundedRectangleBorder] is built from [dialogBorderRadius] and
+  /// [dialogBorderSide].
+  final ShapeBorder? dialogShape;
+
+  /// Used only when [dialogShape] is null.
+  final BorderSide? dialogBorderSide;
+
+  final Color? dialogShadowColor;
+
+  /// Clip of the dialog material; defaults to [Clip.antiAlias].
+  final Clip? dialogClipBehavior;
+
+  final EdgeInsets? headerPadding;
+
+  /// Leading ∑-style mark in the dialog header.
+  final bool? showHeaderIcon;
+
+  final double? previewMinHeight;
+
   final double? symbolTileSize;
   final double? compactSymbolTileSize;
   final double? symbolFontSize;
@@ -147,14 +194,20 @@ class PaeMathTheme extends ThemeExtension<PaeMathTheme> {
       actionColor: scheme.primary,
       actionForegroundColor: scheme.onPrimary,
       barrierColor: Colors.black54,
-      dialogBorderRadius: 28,
+      dialogBorderRadius: 24,
       tileBorderRadius: 8,
       chipBorderRadius: 8,
-      dialogElevation: 6,
+      dialogElevation: 8,
       dialogMaxWidth: 720,
       dialogMaxHeight: 640,
-      dialogPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      dialogInsetPadding: const EdgeInsets.all(24),
+      dialogPadding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      dialogInsetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      dialogBorderSide: BorderSide.none,
+      dialogShadowColor: Colors.black26,
+      dialogClipBehavior: Clip.antiAlias,
+      headerPadding: const EdgeInsets.fromLTRB(20, 14, 8, 14),
+      showHeaderIcon: true,
+      previewMinHeight: 72,
       symbolTileSize: 44,
       compactSymbolTileSize: 34,
       symbolFontSize: 20,
@@ -166,19 +219,34 @@ class PaeMathTheme extends ThemeExtension<PaeMathTheme> {
     );
   }
 
+  /// Default seed when neither [seedColor] nor [colorScheme] is set — matches
+  /// the teal look of the standalone math dialog.
+  static const Color defaultSeedColor = Color(0xFF009688); // Colors.teal
+
   /// App-wide extension merged with [override], filled with defaults from
   /// the resulting color scheme.
+  ///
+  /// When no [colorScheme] / [seedColor] is provided (and the app extension
+  /// also omits them), [defaultSeedColor] is used so the dialog and keyboard
+  /// look the same out of the box.
   static PaeMathTheme resolve(BuildContext context, [PaeMathTheme? override]) {
     final base = Theme.of(context);
     final partial =
         (base.extension<PaeMathTheme>() ?? const PaeMathTheme()).merge(override);
-    final seed = partial.seedColor;
+    final seed = partial.seedColor ?? defaultSeedColor;
     final scheme = partial.colorScheme ??
-        (seed != null
-            ? ColorScheme.fromSeed(seedColor: seed, brightness: base.brightness)
-            : base.colorScheme);
+        ColorScheme.fromSeed(seedColor: seed, brightness: base.brightness);
     return PaeMathTheme.fallback(scheme)
-        .merge(partial.copyWith(colorScheme: scheme));
+        .merge(partial.copyWith(colorScheme: scheme, seedColor: seed));
+  }
+
+  /// Effective dialog outline for [PaeMathDialog].
+  ShapeBorder resolveDialogShape() {
+    if (dialogShape != null) return dialogShape!;
+    return RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(dialogBorderRadius ?? 24),
+      side: dialogBorderSide ?? BorderSide.none,
+    );
   }
 
   /// [other]'s non-null values replace this theme's.
@@ -221,6 +289,13 @@ class PaeMathTheme extends ThemeExtension<PaeMathTheme> {
       dialogMaxHeight: other.dialogMaxHeight,
       dialogPadding: other.dialogPadding,
       dialogInsetPadding: other.dialogInsetPadding,
+      dialogShape: other.dialogShape,
+      dialogBorderSide: other.dialogBorderSide,
+      dialogShadowColor: other.dialogShadowColor,
+      dialogClipBehavior: other.dialogClipBehavior,
+      headerPadding: other.headerPadding,
+      showHeaderIcon: other.showHeaderIcon,
+      previewMinHeight: other.previewMinHeight,
       symbolTileSize: other.symbolTileSize,
       compactSymbolTileSize: other.compactSymbolTileSize,
       symbolFontSize: other.symbolFontSize,
@@ -268,6 +343,13 @@ class PaeMathTheme extends ThemeExtension<PaeMathTheme> {
     double? dialogMaxHeight,
     EdgeInsets? dialogPadding,
     EdgeInsets? dialogInsetPadding,
+    ShapeBorder? dialogShape,
+    BorderSide? dialogBorderSide,
+    Color? dialogShadowColor,
+    Clip? dialogClipBehavior,
+    EdgeInsets? headerPadding,
+    bool? showHeaderIcon,
+    double? previewMinHeight,
     double? symbolTileSize,
     double? compactSymbolTileSize,
     double? symbolFontSize,
@@ -318,6 +400,13 @@ class PaeMathTheme extends ThemeExtension<PaeMathTheme> {
       dialogMaxHeight: dialogMaxHeight ?? this.dialogMaxHeight,
       dialogPadding: dialogPadding ?? this.dialogPadding,
       dialogInsetPadding: dialogInsetPadding ?? this.dialogInsetPadding,
+      dialogShape: dialogShape ?? this.dialogShape,
+      dialogBorderSide: dialogBorderSide ?? this.dialogBorderSide,
+      dialogShadowColor: dialogShadowColor ?? this.dialogShadowColor,
+      dialogClipBehavior: dialogClipBehavior ?? this.dialogClipBehavior,
+      headerPadding: headerPadding ?? this.headerPadding,
+      showHeaderIcon: showHeaderIcon ?? this.showHeaderIcon,
+      previewMinHeight: previewMinHeight ?? this.previewMinHeight,
       symbolTileSize: symbolTileSize ?? this.symbolTileSize,
       compactSymbolTileSize:
           compactSymbolTileSize ?? this.compactSymbolTileSize,
@@ -378,6 +467,14 @@ class PaeMathTheme extends ThemeExtension<PaeMathTheme> {
       dialogPadding: EdgeInsets.lerp(dialogPadding, other.dialogPadding, t),
       dialogInsetPadding:
           EdgeInsets.lerp(dialogInsetPadding, other.dialogInsetPadding, t),
+      dialogShape: t < 0.5 ? dialogShape : other.dialogShape,
+      dialogBorderSide: t < 0.5 ? dialogBorderSide : other.dialogBorderSide,
+      dialogShadowColor: c(dialogShadowColor, other.dialogShadowColor),
+      dialogClipBehavior:
+          t < 0.5 ? dialogClipBehavior : other.dialogClipBehavior,
+      headerPadding: EdgeInsets.lerp(headerPadding, other.headerPadding, t),
+      showHeaderIcon: t < 0.5 ? showHeaderIcon : other.showHeaderIcon,
+      previewMinHeight: d(previewMinHeight, other.previewMinHeight),
       symbolTileSize: d(symbolTileSize, other.symbolTileSize),
       compactSymbolTileSize:
           d(compactSymbolTileSize, other.compactSymbolTileSize),
@@ -406,6 +503,7 @@ class PaeMathLabels {
     this.tapToCopyHint = 'Tap to copy',
     this.latexLabel = 'LaTeX',
     this.latexHint = r'e.g. x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}',
+    this.templatesLabel = 'Templates',
     this.pasteFormula = 'Paste formula',
     this.preview = 'Preview',
     this.copyLatex = 'Copy LaTeX',
@@ -416,6 +514,8 @@ class PaeMathLabels {
     this.latexCopied = 'LaTeX copied',
     this.noFormulaOnClipboard = 'No formula on the clipboard',
     this.toolbarTooltip = 'Math symbols & formulas',
+    this.cannotFormatFormula =
+        "Formatting can't be applied to LaTeX formulas",
     this.keyboardTitle = 'Math',
     this.formulasCategory = 'Formulas',
     this.openLatexEditor = 'LaTeX editor',
@@ -430,6 +530,7 @@ class PaeMathLabels {
   final String tapToCopyHint;
   final String latexLabel;
   final String latexHint;
+  final String templatesLabel;
   final String pasteFormula;
   final String preview;
   final String copyLatex;
@@ -444,6 +545,9 @@ class PaeMathLabels {
 
   /// Editor toolbar button.
   final String toolbarTooltip;
+
+  /// Shown when the user tries to bold / resize / restyle a formula embed.
+  final String cannotFormatFormula;
 
   /// [PaeMathKeyboard] texts.
   final String keyboardTitle;

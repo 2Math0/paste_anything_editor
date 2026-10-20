@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:paste_anything/paste_anything.dart';
 
@@ -63,21 +65,52 @@ class PaeMathPanel extends StatefulWidget {
 class _PaeMathPanelState extends State<PaeMathPanel>
     with SingleTickerProviderStateMixin {
   late final bool _bothTabs = widget.showSymbolsTab && widget.showFormulaTab;
-  late final TabController _tabs = TabController(
-    length: _bothTabs ? 2 : 1,
-    vsync: this,
-    initialIndex: _bothTabs && widget.initialLatex != null ? 1 : 0,
-  );
+  /// Only created when both tabs are shown. A `late final` initializer would
+  /// lazily construct a [TabController] inside [dispose] for formula-only
+  /// dialogs and look up [TickerMode] on a deactivated element.
+  TabController? _tabs;
   late final TextEditingController _latex =
       TextEditingController(text: widget.initialLatex ?? '');
   final FocusNode _latexFocus = FocusNode();
+
+  /// Cached in [didChangeDependencies] so async toasts never walk a dead tree.
+  ScaffoldMessengerState? _messenger;
+  Timer? _previewTimer;
+  late String _previewLatex = PaeMath.normalizeLatex(_latex.text);
 
   PaeMathLabels get _labels => widget.labels;
   List<PaeMathSymbolGroup> get _groups => widget.symbolGroups ?? kPaeMathSymbolGroups;
 
   @override
+  void initState() {
+    super.initState();
+    if (_bothTabs) {
+      _tabs = TabController(
+        length: 2,
+        vsync: this,
+        initialIndex: widget.initialLatex != null ? 1 : 0,
+      );
+    }
+    _latex.addListener(_schedulePreview);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _messenger = ScaffoldMessenger.maybeOf(context);
+  }
+
+  @override
   void dispose() {
-    _tabs.dispose();
+    _previewTimer?.cancel();
+    _latex.removeListener(_schedulePreview);
+    // Drop focus before disposing the node so FocusScope is not looked up on
+    // a deactivated element (common when the dialog pops after a tap).
+    _latexFocus.canRequestFocus = false;
+    if (_latexFocus.hasPrimaryFocus || _latexFocus.hasFocus) {
+      _latexFocus.unfocus(disposition: UnfocusDisposition.previouslyFocusedChild);
+    }
+    _tabs?.dispose();
     _latex.dispose();
     _latexFocus.dispose();
     super.dispose();
@@ -85,9 +118,18 @@ class _PaeMathPanelState extends State<PaeMathPanel>
 
   String get _formula => PaeMath.normalizeLatex(_latex.text);
 
+  void _schedulePreview() {
+    _previewTimer?.cancel();
+    _previewTimer = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      final next = PaeMath.normalizeLatex(_latex.text);
+      if (next == _previewLatex) return;
+      setState(() => _previewLatex = next);
+    });
+  }
+
   void _toast(String message) {
-    ScaffoldMessenger.maybeOf(context)
-        ?.showSnackBar(SnackBar(content: Text(message)));
+    _messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _onSymbolTap(PaeMathSymbol symbol) async {
@@ -101,6 +143,7 @@ class _PaeMathPanelState extends State<PaeMathPanel>
 
   Future<void> _copySymbol(PaeMathSymbol symbol) async {
     await PaeClipboard.writeText(symbol.char);
+    if (!mounted) return;
     _toast('${_labels.copiedPrefix} ${symbol.char}');
   }
 
@@ -121,6 +164,7 @@ class _PaeMathPanelState extends State<PaeMathPanel>
 
   Future<void> _pasteFormula() async {
     final latex = await PaeMath.readFormula();
+    if (!mounted) return;
     if (latex == null || latex.isEmpty) {
       _toast(_labels.noFormulaOnClipboard);
       return;
@@ -131,12 +175,14 @@ class _PaeMathPanelState extends State<PaeMathPanel>
   Future<void> _copyFormula() async {
     if (_formula.isEmpty) return;
     await PaeMath.copyFormula(_formula);
+    if (!mounted) return;
     _toast(_labels.formulaCopied);
   }
 
   Future<void> _copyLatex() async {
     if (_formula.isEmpty) return;
     await PaeClipboard.writeText(_formula);
+    if (!mounted) return;
     _toast(_labels.latexCopied);
   }
 
@@ -155,29 +201,53 @@ class _PaeMathPanelState extends State<PaeMathPanel>
           ? _buildSymbolsTab(context, t)
           : _buildFormulaTab(context, t);
     }
+    final pillRadius = BorderRadius.circular(t.chipBorderRadius! + 4);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TabBar(
-          controller: _tabs,
-          indicatorColor: t.tabIndicatorColor,
-          labelColor: t.tabSelectedColor,
-          unselectedLabelColor: t.tabUnselectedColor,
-          dividerColor: t.previewBorderColor,
-          tabs: [
-            Tab(icon: const Icon(Icons.grid_view), text: _labels.symbolsTab),
-            Tab(icon: const Icon(Icons.functions), text: _labels.formulaTab),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Flexible(
-          child: TabBarView(
-            controller: _tabs,
-            children: [
-              _buildSymbolsTab(context, t),
-              _buildFormulaTab(context, t),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: t.inputFillColor,
+            borderRadius: pillRadius,
+          ),
+          child: TabBar(
+            controller: _tabs!,
+            indicatorSize: TabBarIndicatorSize.tab,
+            dividerColor: Colors.transparent,
+            indicator: BoxDecoration(
+              color: t.chipSelectedColor,
+              borderRadius: pillRadius,
+            ),
+            labelColor: t.chipSelectedLabelColor,
+            unselectedLabelColor: t.tabUnselectedColor,
+            labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+            tabs: [
+              Tab(
+                height: 40,
+                iconMargin: const EdgeInsets.only(bottom: 2),
+                icon: const Icon(Icons.grid_view_rounded, size: 18),
+                text: _labels.symbolsTab,
+              ),
+              Tab(
+                height: 40,
+                iconMargin: const EdgeInsets.only(bottom: 2),
+                icon: const Icon(Icons.functions_rounded, size: 18),
+                text: _labels.formulaTab,
+              ),
             ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Flexible(
+          // Build only the visible tab — TabBarView would mount both and
+          // parse every formula template up front.
+          child: ListenableBuilder(
+            listenable: _tabs!,
+            builder: (context, _) => _tabs!.index == 0
+                ? _buildSymbolsTab(context, t)
+                : _buildFormulaTab(context, t),
           ),
         ),
       ],
@@ -216,9 +286,16 @@ class _PaeMathPanelState extends State<PaeMathPanel>
       borderRadius: BorderRadius.circular(t.chipBorderRadius!),
     );
     final fieldRadius = BorderRadius.circular(t.tileBorderRadius!);
+    final sectionStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: t.tabUnselectedColor,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+        );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(_labels.templatesLabel, style: sectionStyle),
+        const SizedBox(height: 8),
         Wrap(
           spacing: 6,
           runSpacing: 6,
@@ -226,19 +303,33 @@ class _PaeMathPanelState extends State<PaeMathPanel>
             for (final tpl in widget.templates ?? kPaeMathTemplates)
               Tooltip(
                 message: '${tpl.tooltip}\n${tpl.latex}',
-                child: ActionChip(
-                  label: Text(tpl.label),
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: t.templateChipColor,
-                  labelStyle: TextStyle(color: t.templateChipLabelColor),
-                  side: BorderSide.none,
+                child: Material(
+                  color: t.templateChipColor,
                   shape: chipShape,
-                  onPressed: () => _insertIntoFormula(tpl.latex),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _insertIntoFormula(tpl.latex),
+                    customBorder: chipShape,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        tpl.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: t.templateChipLabelColor,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 14),
         TextField(
           controller: _latex,
           focusNode: _latexFocus,
@@ -250,6 +341,7 @@ class _PaeMathPanelState extends State<PaeMathPanel>
             hintText: _labels.latexHint,
             filled: true,
             fillColor: t.inputFillColor,
+            contentPadding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
             border: OutlineInputBorder(borderRadius: fieldRadius),
             enabledBorder: OutlineInputBorder(
               borderRadius: fieldRadius,
@@ -257,49 +349,49 @@ class _PaeMathPanelState extends State<PaeMathPanel>
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: fieldRadius,
-              borderSide: BorderSide(color: t.actionColor!, width: 2),
+              borderSide: BorderSide(color: t.actionColor!, width: 1.5),
             ),
             suffixIcon: IconButton(
               tooltip: _labels.pasteFormula,
-              icon: const Icon(Icons.content_paste),
+              icon: const Icon(Icons.content_paste_rounded),
               onPressed: _pasteFormula,
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        Text(_labels.preview, style: sectionStyle),
         const SizedBox(height: 8),
         Container(
-          constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsets.all(12),
+          constraints: BoxConstraints(minHeight: t.previewMinHeight!),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             border: Border.all(color: t.previewBorderColor!),
             borderRadius: fieldRadius,
             color: t.previewBackgroundColor,
           ),
-          child: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _latex,
-            builder: (context, value, _) {
-              final latex = PaeMath.normalizeLatex(value.text);
-              if (latex.isEmpty) {
-                return Text(
-                  _labels.preview,
-                  style: TextStyle(color: t.tabUnselectedColor),
-                );
-              }
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: PaeMathView(
-                  latex,
-                  display: true,
-                  textStyle: TextStyle(
-                    fontSize: t.previewFontSize,
-                    color: t.previewFormulaColor,
+          alignment: Alignment.centerLeft,
+          child: _previewLatex.isEmpty
+              ? Text(
+                  _labels.latexHint,
+                  style: TextStyle(
+                    color: t.tabUnselectedColor,
+                    fontSize: 13,
+                  ),
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: PaeMathView(
+                    _previewLatex,
+                    display: true,
+                    textStyle: TextStyle(
+                      fontSize: t.previewFontSize,
+                      color: t.previewFormulaColor,
+                    ),
                   ),
                 ),
-              );
-            },
-          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Expanded(
           child: _SymbolPalette(
             groups: _groups,
@@ -308,38 +400,58 @@ class _PaeMathPanelState extends State<PaeMathPanel>
             onTap: (s) => _insertIntoFormula(s.latexOrChar),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         ValueListenableBuilder<TextEditingValue>(
           valueListenable: _latex,
           builder: (context, value, _) {
             final hasFormula = PaeMath.normalizeLatex(value.text).isNotEmpty;
-            return Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 8,
-              children: [
-                TextButton.icon(
-                  onPressed: hasFormula ? _copyLatex : null,
-                  icon: const Icon(Icons.code, size: 18),
-                  label: Text(_labels.copyLatex),
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: t.previewBorderColor!),
                 ),
-                OutlinedButton.icon(
-                  onPressed: hasFormula ? _copyFormula : null,
-                  icon: const Icon(Icons.content_copy, size: 18),
-                  label: Text(_labels.copyFormula),
-                ),
-                if (widget.onFormula != null)
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: t.actionColor,
-                      foregroundColor: t.actionForegroundColor,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    TextButton.icon(
+                      onPressed: hasFormula ? _copyLatex : null,
+                      icon: const Icon(Icons.code_rounded, size: 18),
+                      label: Text(_labels.copyLatex),
                     ),
-                    onPressed: hasFormula
-                        ? () => widget.onFormula!(_formula)
-                        : null,
-                    icon: const Icon(Icons.check, size: 18),
-                    label: Text(_labels.insert),
-                  ),
-              ],
+                    OutlinedButton.icon(
+                      onPressed: hasFormula ? _copyFormula : null,
+                      icon: const Icon(Icons.content_copy_rounded, size: 18),
+                      label: Text(_labels.copyFormula),
+                    ),
+                    if (widget.onFormula != null)
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: t.actionColor,
+                          foregroundColor: t.actionForegroundColor,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              t.chipBorderRadius!,
+                            ),
+                          ),
+                        ),
+                        onPressed: hasFormula
+                            ? () => widget.onFormula!(_formula)
+                            : null,
+                        icon: const Icon(Icons.check_rounded, size: 18),
+                        label: Text(_labels.insert),
+                      ),
+                  ],
+                ),
+              ),
             );
           },
         ),
@@ -475,6 +587,7 @@ abstract final class PaeMathDialog {
   }) {
     final t = PaeMathTheme.resolve(context, theme);
     final titleStyle = t.titleTextStyle!;
+    final shape = t.resolveDialogShape();
     return showDialog<PaeMathInsertion>(
       context: context,
       barrierColor: t.barrierColor,
@@ -484,11 +597,10 @@ abstract final class PaeMathDialog {
         backgroundColor: t.backgroundColor,
         surfaceTintColor: Colors.transparent,
         elevation: t.dialogElevation,
+        shadowColor: t.dialogShadowColor,
         insetPadding: t.dialogInsetPadding,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(t.dialogBorderRadius!),
-        ),
+        clipBehavior: t.dialogClipBehavior ?? Clip.antiAlias,
+        shape: shape,
         child: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: t.dialogMaxWidth!,
@@ -497,26 +609,55 @@ abstract final class PaeMathDialog {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                color: t.headerColor,
-                padding: const EdgeInsets.fromLTRB(20, 6, 8, 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        labels.title,
-                        style: titleStyle.copyWith(
-                          color: titleStyle.color ?? t.headerForegroundColor,
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: t.headerColor,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: t.previewBorderColor!.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ),
+                child: Padding(
+                  padding: t.headerPadding!,
+                  child: Row(
+                    children: [
+                      if (t.showHeaderIcon ?? true) ...[
+                        Container(
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: t.actionColor!.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(
+                              t.tileBorderRadius!,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.functions_rounded,
+                            size: 20,
+                            color: t.actionColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: Text(
+                          labels.title,
+                          style: titleStyle.copyWith(
+                            color: titleStyle.color ?? t.headerForegroundColor,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: labels.close,
-                      color: t.headerForegroundColor,
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
+                      IconButton(
+                        tooltip: labels.close,
+                        color: t.headerForegroundColor,
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => _popAfterFrame(ctx),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               Expanded(
@@ -530,9 +671,14 @@ abstract final class PaeMathDialog {
                     templates: templates,
                     showSymbolsTab: showSymbolsTab,
                     showFormulaTab: showFormulaTab,
-                    onSymbol: (c) => Navigator.pop(ctx, PaeMathSymbolInsertion(c)),
-                    onFormula: (l) =>
-                        Navigator.pop(ctx, PaeMathFormulaInsertion(l)),
+                    onSymbol: (c) => _popAfterFrame(
+                      ctx,
+                      PaeMathSymbolInsertion(c),
+                    ),
+                    onFormula: (l) => _popAfterFrame(
+                      ctx,
+                      PaeMathFormulaInsertion(l),
+                    ),
                   ),
                 ),
               ),
@@ -541,5 +687,14 @@ abstract final class PaeMathDialog {
         ),
       ),
     );
+  }
+
+  /// Pop on the next frame so the tapping widget can finish dispose without
+  /// walking a deactivated ancestor tree.
+  static void _popAfterFrame(BuildContext ctx, [PaeMathInsertion? result]) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!ctx.mounted) return;
+      Navigator.of(ctx).pop(result);
+    });
   }
 }

@@ -27,12 +27,18 @@ class PaeMathEmbedBuilder extends EmbedBuilder {
 
   @override
   Widget build(BuildContext context, EmbedContext embedContext) {
-    final latex = embedContext.node.value.data.toString();
+    final snippet =
+        PaeMathSnippet.fromEmbedValue(embedContext.node.value.data);
+    final latex = snippet.latex;
     final controller = embedContext.controller;
     final offset = embedContext.node.documentOffset;
     final formula = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: PaeMathView(latex, textStyle: embedContext.textStyle),
+      child: PaeMathView(
+        latex,
+        display: snippet.display,
+        textStyle: embedContext.textStyle,
+      ),
     );
 
     if (embedContext.readOnly) return formula;
@@ -46,10 +52,14 @@ class PaeMathEmbedBuilder extends EmbedBuilder {
         showSymbolsTab: false,
       );
       if (result is PaeMathFormulaInsertion) {
+        final updated = PaeMath.parseSnippet(
+          result.latex,
+          display: snippet.display,
+        );
         controller.replaceText(
           offset,
           1,
-          Embeddable(PaeQuillCodec.mathEmbedType, result.latex),
+          Embeddable(PaeQuillCodec.mathEmbedType, updated.toEmbedValue()),
           null,
         );
       }
@@ -82,7 +92,7 @@ class PaeMathEmbedBuilder extends EmbedBuilder {
               case 'edit':
                 await edit();
               case 'copy':
-                await PaeMath.copyFormula(latex);
+                await PaeMath.copyFormula(latex, display: snippet.display);
               case 'latex':
                 await PaeClipboard.writeText(latex);
               case 'remove':

@@ -36,8 +36,19 @@ abstract final class PaeQuillCodec {
   /// is true and their source is displayable.
   static Delta htmlToDelta(String html, {bool keepImages = true}) {
     final clean = PaeHtml.normalize(html, keepImages: keepImages);
-    final root = html_parser.parse(clean).body;
+    final document = html_parser.parse(clean);
+    final root = document.body;
     if (root == null) return Delta()..insert('\n');
+
+    // normalize already emits formula spans in body; still move any leftover
+    // MathJax scripts from <head> before extract.
+    final head = document.head;
+    if (head != null) {
+      for (final el
+          in head.querySelectorAll('script[type^="math/tex"]').toList()) {
+        root.append(el);
+      }
+    }
 
     final formulas = PaeMath.extractFormulas(root);
     final tables = <String>[];
@@ -108,7 +119,10 @@ abstract final class PaeQuillCodec {
 
   /// Turns [PaeMath.tokenPattern] placeholders in text ops into inline
   /// [mathEmbedType] embeds, keeping the surrounding text attributes.
-  static Delta _expandFormulaPlaceholders(Delta source, List<String> formulas) {
+  static Delta _expandFormulaPlaceholders(
+    Delta source,
+    List<PaeMathSnippet> formulas,
+  ) {
     if (formulas.isEmpty) return source;
     final out = Delta();
     for (final op in source.toList()) {
@@ -123,7 +137,7 @@ abstract final class PaeQuillCodec {
         if (i >= formulas.length) continue;
         final before = data.substring(start, m.start);
         if (before.isNotEmpty) out.insert(before, op.attributes);
-        out.insert({mathEmbedType: formulas[i]}, op.attributes);
+        out.insert({mathEmbedType: formulas[i].toEmbedValue()}, op.attributes);
         start = m.end;
       }
       final rest = data.substring(start);
@@ -154,7 +168,11 @@ abstract final class PaeQuillCodec {
         return op.insert.value.toString();
       }
       if (op.insert.type == mathEmbedType) {
-        return PaeMath.formulaToHtml(op.insert.value.toString());
+        final snippet = PaeMathSnippet.fromEmbedValue(op.insert.value);
+        return PaeMath.formulaToHtml(
+          snippet.latex,
+          display: snippet.display,
+        );
       }
       return '';
     };

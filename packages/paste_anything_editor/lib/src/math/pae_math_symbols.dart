@@ -38,12 +38,18 @@ const List<PaeMathTemplate> kPaeMathTemplates = [
   PaeMathTemplate('lim', r'\lim_{x \to \infty} ', 'Limit'),
   PaeMathTemplate('d/dx', r'\frac{d}{dx}', 'Derivative'),
   PaeMathTemplate('log', r'\log_{b}(x)', 'Logarithm'),
-  PaeMathTemplate('( )', r'\left( x \right)', 'Parentheses'),
+  PaeMathTemplate('(x)', r'\left( x \right)', 'Parentheses'),
   PaeMathTemplate('|x|', r'\left| x \right|', 'Absolute value'),
   PaeMathTemplate('x̄', r'\overline{x}', 'Overline'),
   PaeMathTemplate('v⃗', r'\vec{v}', 'Vector'),
-  PaeMathTemplate('[ ]', r'\begin{pmatrix} a & b \\ c & d \end{pmatrix}',
-      'Matrix'),
+  // Delimiter in the label matches the LaTeX environment:
+  // pmatrix → ( ), bmatrix → [ ], vmatrix → | | (determinant).
+  PaeMathTemplate('( )', r'\begin{pmatrix} a & b \\ c & d \end{pmatrix}',
+      'Matrix (parentheses)'),
+  PaeMathTemplate('[ ]', r'\begin{bmatrix} a & b \\ c & d \end{bmatrix}',
+      'Matrix (brackets)'),
+  PaeMathTemplate('| |', r'\begin{vmatrix} a & b \\ c & d \end{vmatrix}',
+      'Determinant'),
   PaeMathTemplate('{ }', r'f(x) = \begin{cases} a & x > 0 \\ b & x \le 0 \end{cases}',
       'Cases'),
 ];

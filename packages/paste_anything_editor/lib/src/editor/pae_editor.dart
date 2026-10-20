@@ -11,6 +11,8 @@ import '../math/pae_math_theme.dart';
 import 'pae_image_embed.dart';
 import 'pae_quill_localizations_scope.dart';
 import 'pae_editor_controller.dart';
+import 'pae_editor_theme.dart';
+import 'pae_quill_controller.dart';
 import 'pae_table_embed.dart';
 
 /// Shows a copy/paste result to the user (toast, snackbar, ...).
@@ -29,11 +31,13 @@ class PaeEditor extends StatefulWidget {
     this.onChanged,
     this.onEditorInitialized,
     this.showContentLabel = true,
-    this.contentLabel = 'Content',
+    this.contentLabel,
     this.showMathButton = true,
     this.mathInputMode = PaeMathInputMode.keyboard,
     this.onNotify,
     this.embedBuilders = const [],
+    this.editorTheme,
+    this.editorLabels = const PaeEditorLabels(),
     this.mathTheme,
     this.mathLabels = const PaeMathLabels(),
   });
@@ -49,7 +53,9 @@ class PaeEditor extends StatefulWidget {
 
   /// When false, hides the left label (copy/paste row remains).
   final bool showContentLabel;
-  final String contentLabel;
+
+  /// Overrides [PaeEditorLabels.contentLabel] when non-null.
+  final String? contentLabel;
 
   /// Adds the math symbols & formulas button to the toolbar.
   final bool showMathButton;
@@ -58,14 +64,25 @@ class PaeEditor extends StatefulWidget {
   /// editor focused (default), or a modal [PaeMathDialog].
   final PaeMathInputMode mathInputMode;
 
-  /// Copy/paste feedback. Defaults to a [SnackBar].
+  /// Full control over toasts. When set, replaces the default [SnackBar].
+  ///
+  /// ```dart
+  /// onNotify: (msg, {isError = false}) => myToast(msg, error: isError),
+  /// ```
   final PaeNotifier? onNotify;
 
   /// Extra embed builders, checked after the built-in ones.
   final List<EmbedBuilder> embedBuilders;
 
-  /// Colors / shape of the math keyboard and dialog opened from this editor. Falls back to the app-wide
-  /// [PaeMathTheme] extension, then the Material color scheme.
+  /// Editor chrome (border, copy/paste row, snackbar). Falls back to the
+  /// app-wide [PaeEditorTheme] extension, then the Material color scheme.
+  final PaeEditorTheme? editorTheme;
+
+  /// Toasts, tooltips and the content label.
+  final PaeEditorLabels editorLabels;
+
+  /// Colors / shape of the math keyboard and dialog. Falls back to the
+  /// app-wide [PaeMathTheme] extension, then the Material color scheme.
   final PaeMathTheme? mathTheme;
   final PaeMathLabels mathLabels;
 
@@ -81,6 +98,7 @@ class _PaeEditorState extends State<PaeEditor> {
   void initState() {
     super.initState();
     widget.controller.quillController.addListener(_emitChange);
+    _attachMathFormatGuard(widget.controller);
   }
 
   @override
@@ -88,14 +106,35 @@ class _PaeEditorState extends State<PaeEditor> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.quillController.removeListener(_emitChange);
+      _detachMathFormatGuard(oldWidget.controller);
       widget.controller.quillController.addListener(_emitChange);
+      _attachMathFormatGuard(widget.controller);
     }
   }
 
   @override
   void dispose() {
     widget.controller.quillController.removeListener(_emitChange);
+    _detachMathFormatGuard(widget.controller);
     super.dispose();
+  }
+
+  void _attachMathFormatGuard(PaeEditorController controller) {
+    final quill = controller.quillController;
+    if (quill is PaeQuillController) {
+      quill.onMathFormatBlocked = _onMathFormatBlocked;
+    }
+  }
+
+  void _detachMathFormatGuard(PaeEditorController controller) {
+    final quill = controller.quillController;
+    if (quill is PaeQuillController) {
+      quill.onMathFormatBlocked = null;
+    }
+  }
+
+  void _onMathFormatBlocked() {
+    _notify(widget.editorLabels.cannotFormatFormula);
   }
 
   void _emitChange() {
@@ -113,10 +152,24 @@ class _PaeEditorState extends State<PaeEditor> {
       notify(message, isError: isError);
       return;
     }
+    final t = PaeEditorTheme.resolve(context, widget.editorTheme);
+    final bg = isError
+        ? t.snackBarErrorBackgroundColor
+        : t.snackBarBackgroundColor;
+    final fg = isError
+        ? t.snackBarErrorForegroundColor
+        : t.snackBarForegroundColor;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
+        content: Text(message, style: TextStyle(color: fg)),
+        backgroundColor: bg,
+        duration: t.snackBarDuration ?? const Duration(seconds: 3),
+        behavior: t.snackBarBehavior,
+        margin: t.snackBarMargin,
+        padding: t.snackBarPadding,
+        shape: t.snackBarShape,
+        elevation: t.snackBarElevation,
+        width: t.snackBarWidth,
       ),
     );
   }
@@ -166,6 +219,9 @@ class _PaeEditorState extends State<PaeEditor> {
       });
     }
 
+    final et = PaeEditorTheme.resolve(context, widget.editorTheme);
+    final labels = widget.editorLabels;
+    final contentLabel = widget.contentLabel ?? labels.contentLabel;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -173,14 +229,12 @@ class _PaeEditorState extends State<PaeEditor> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             if (widget.showContentLabel)
-              Text(
-                widget.contentLabel,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              )
+              Text(contentLabel, style: et.contentLabelStyle)
             else
               const SizedBox.shrink(),
             _CopyPasteToolbar(
+              theme: et,
+              labels: labels,
               onCopyFormatted: _copyWithFormatting,
               onCopyPlain: _copyAsPlainText,
               onPasteFormatted: _pasteWithFormatting,
@@ -193,15 +247,18 @@ class _PaeEditorState extends State<PaeEditor> {
         Container(
           height: widget.height,
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: et.borderColor!,
+              width: et.borderWidth!,
+            ),
+            borderRadius: BorderRadius.circular(et.borderRadius!),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Material(
-                color: Colors.grey.shade50,
+                color: et.toolbarBackgroundColor,
                 child: QuillSimpleToolbar(
                   controller: c.quillController,
                   config: QuillSimpleToolbarConfig(
@@ -294,12 +351,12 @@ class _PaeEditorState extends State<PaeEditor> {
       final content = await _getEditorContent();
       if (content.isNotEmpty) {
         await PaeEditorController.copyHtml(content);
-        _notify('Copied with formatting');
+        _notify(widget.editorLabels.copiedWithFormatting);
       } else {
-        _notify('No content to copy', isError: true);
+        _notify(widget.editorLabels.noContentToCopy, isError: true);
       }
     } catch (e) {
-      _notify('Failed to copy', isError: true);
+      _notify(widget.editorLabels.failedToCopy, isError: true);
     }
   }
 
@@ -310,24 +367,24 @@ class _PaeEditorState extends State<PaeEditor> {
         await Clipboard.setData(
           ClipboardData(text: PaeHtml.toPlainText(content)),
         );
-        _notify('Copied as plain text');
+        _notify(widget.editorLabels.copiedAsPlainText);
       } else {
-        _notify('No content to copy', isError: true);
+        _notify(widget.editorLabels.noContentToCopy, isError: true);
       }
     } catch (e) {
-      _notify('Failed to copy', isError: true);
+      _notify(widget.editorLabels.failedToCopy, isError: true);
     }
   }
 
   Future<void> _pasteWithFormatting() async {
     try {
       if (await widget.controller.pasteFromClipboard()) {
-        _notify('Pasted with formatting');
+        _notify(widget.editorLabels.pastedWithFormatting);
       } else {
-        _notify('Nothing to paste', isError: true);
+        _notify(widget.editorLabels.nothingToPaste, isError: true);
       }
     } catch (e) {
-      _notify('Failed to paste', isError: true);
+      _notify(widget.editorLabels.failedToPaste, isError: true);
     }
   }
 
@@ -336,12 +393,12 @@ class _PaeEditorState extends State<PaeEditor> {
       final text = await PaeClipboard.readText();
       if (text != null && text.isNotEmpty) {
         widget.controller.insertText(text);
-        _notify('Pasted as plain text');
+        _notify(widget.editorLabels.pastedAsPlainText);
       } else {
-        _notify('Nothing to paste', isError: true);
+        _notify(widget.editorLabels.nothingToPaste, isError: true);
       }
     } catch (e) {
-      _notify('Failed to paste', isError: true);
+      _notify(widget.editorLabels.failedToPaste, isError: true);
     }
   }
 
@@ -359,12 +416,16 @@ class _PaeEditorState extends State<PaeEditor> {
 
 class _CopyPasteToolbar extends StatelessWidget {
   const _CopyPasteToolbar({
+    required this.theme,
+    required this.labels,
     required this.onCopyFormatted,
     required this.onCopyPlain,
     required this.onPasteFormatted,
     required this.onPastePlain,
   });
 
+  final PaeEditorTheme theme;
+  final PaeEditorLabels labels;
   final VoidCallback onCopyFormatted;
   final VoidCallback onCopyPlain;
   final VoidCallback onPasteFormatted;
@@ -372,26 +433,27 @@ class _CopyPasteToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = theme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        color: t.copyPasteBackgroundColor,
+        borderRadius: BorderRadius.circular(t.copyPasteBorderRadius!),
+        border: Border.all(color: t.copyPasteBorderColor!),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           _EditorIconButton(
             icon: Icons.content_copy,
-            color: Colors.blue,
-            tooltip: 'Copy with formatting',
+            color: t.copyFormattedColor!,
+            tooltip: labels.copyFormattedTooltip,
             onPressed: onCopyFormatted,
           ),
           _EditorIconButton(
             icon: Icons.content_paste,
-            color: Colors.green,
-            tooltip: 'Paste with formatting',
+            color: t.pasteFormattedColor!,
+            tooltip: labels.pasteFormattedTooltip,
             onPressed: onPasteFormatted,
           ),
           const VerticalDivider(
@@ -402,14 +464,14 @@ class _CopyPasteToolbar extends StatelessWidget {
           ),
           _EditorIconButton(
             icon: Icons.text_fields,
-            color: Colors.orange,
-            tooltip: 'Copy as plain text',
+            color: t.copyPlainColor!,
+            tooltip: labels.copyPlainTooltip,
             onPressed: onCopyPlain,
           ),
           _EditorIconButton(
             icon: Icons.text_snippet,
-            color: Colors.purple,
-            tooltip: 'Paste as plain text',
+            color: t.pastePlainColor!,
+            tooltip: labels.pastePlainTooltip,
             onPressed: onPastePlain,
           ),
         ],

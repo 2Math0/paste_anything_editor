@@ -9,6 +9,7 @@ import 'package:flutter_quill/quill_delta.dart';
 import 'package:paste_anything/paste_anything.dart';
 
 import '../codec/pae_quill_codec.dart';
+import 'pae_quill_controller.dart';
 
 /// Turns pasted image bytes into the URL stored in the document, e.g. by
 /// uploading them. Return null to drop the image.
@@ -29,7 +30,9 @@ class PaeEditorController implements PaeTarget {
     this.allowImagePaste = false,
     this.onImagePaste,
   }) {
-    quillController = QuillController.basic(
+    quillController = PaeQuillController(
+      document: Document(),
+      selection: const TextSelection.collapsed(offset: 0),
       config: QuillControllerConfig(
         clipboardConfig: QuillClipboardConfig(
           onClipboardPaste: _handleClipboardPaste,
@@ -185,17 +188,20 @@ class PaeEditorController implements PaeTarget {
     );
   }
 
-  /// Inserts [latex] as an inline formula embed at the cursor.
-  void insertFormula(String latex) {
-    final value = PaeMath.normalizeLatex(latex);
-    if (value.isEmpty) return;
+  /// Inserts [latex] as a formula embed at the cursor.
+  ///
+  /// Display mode is taken from [display], or inferred from `$$…$$` / `\[…\]`
+  /// delimiters when [display] is null.
+  void insertFormula(String latex, {bool? display}) {
+    final snippet = PaeMath.parseSnippet(latex, display: display);
+    if (snippet.latex.isEmpty) return;
     final sel = quillController.selection;
     final start = sel.isValid ? sel.start : 0;
     final end = sel.isValid ? sel.end : 0;
     quillController.replaceText(
       start,
       end - start,
-      Embeddable(PaeQuillCodec.mathEmbedType, value),
+      Embeddable(PaeQuillCodec.mathEmbedType, snippet.toEmbedValue()),
       TextSelection.collapsed(offset: start + 1),
     );
   }

@@ -182,6 +182,16 @@ abstract final class PaeHtml {
     final root = document.body ?? document.documentElement;
     if (root == null) return '';
 
+    // Parsers often park <script> in <head>; move math scripts into [root]
+    // so extractFormulas / restore keep them in the normalized output.
+    final head = document.head;
+    if (head != null && !identical(head, root)) {
+      for (final el
+          in head.querySelectorAll('script[type^="math/tex"]').toList()) {
+        root.append(el);
+      }
+    }
+
     final formulas = PaeMath.extractFormulas(root);
     _stripNonContent(root);
     _stripUnsafeAttributes(root);
@@ -214,7 +224,7 @@ abstract final class PaeHtml {
   /// GitHub-flavored Markdown to HTML. LaTeX is protected first so Markdown
   /// doesn't turn `_` / `*` inside formulas into emphasis.
   static String fromMarkdown(String markdown) {
-    final formulas = <String>[];
+    final formulas = <PaeMathSnippet>[];
     final html = md.markdownToHtml(
       PaeMath.protect(markdown, formulas),
       extensionSet: md.ExtensionSet.gitHubFlavored,
@@ -225,7 +235,7 @@ abstract final class PaeHtml {
   /// Plain text to escaped HTML paragraphs, with delimited LaTeX turned into
   /// formula spans.
   static String fromPlainText(String text) {
-    final formulas = <String>[];
+    final formulas = <PaeMathSnippet>[];
     final protected = PaeMath.protect(text, formulas);
     return protected.split('\n').map((line) {
       final escaped = _textEscape.convert(line);

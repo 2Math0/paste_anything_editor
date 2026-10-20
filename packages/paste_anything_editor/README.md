@@ -90,18 +90,86 @@ MathJax can render. To show saved HTML with formulas in `HtmlWidget`:
 HtmlWidget(html, customWidgetBuilder: paeMathHtmlBuilder);
 ```
 
-## Images
+## Images (opt-in)
 
-Pasted images are dropped unless you allow them.
+**Off by default.** Clipboard images are ignored until you turn them on on
+the controller. When enabled with no upload handler, pasted bitmaps become
+inline `data:` URIs (base64 “bytecode” in the HTML).
 
 ```dart
-// Keep images inline as base64 data: URIs.
-PaeEditorController(allowImagePaste: true);
+// 1) Enable + embed as data: URIs (no server).
+final controller = PaeEditorController(allowImagePaste: true);
 
-// Or upload them and store the returned URL (return null to drop).
-PaeEditorController(
+// 2) Enable + upload (return a URL, or null to drop the image).
+final controller = PaeEditorController(
   allowImagePaste: true,
-  onImagePaste: (bytes, mimeType) => uploadAndGetUrl(bytes, mimeType),
+  onImagePaste: (bytes, mimeType) async {
+    return await uploadAndGetUrl(bytes, mimeType);
+  },
+);
+
+PaeEditor(controller: controller);
+```
+
+Same flag exists on the core paster if you use `paste_anything` alone:
+
+```dart
+const PaePaster(allowImages: true).pasteInto(myTarget);
+```
+
+## Full customization (colors, sizes, toasts)
+
+Developers get three layers:
+
+| Layer | What it styles |
+|-------|----------------|
+| `PaeEditorTheme` / `PaeEditorLabels` | Editor frame, copy/paste row, **all toasts** |
+| `PaeMathTheme` / `PaeMathLabels` | Math keyboard + LaTeX dialog |
+| `onNotify` | Replace SnackBars with your own toast system |
+
+```dart
+PaeEditor(
+  controller: controller,
+  // Own toast system (optional). When set, default SnackBars are skipped.
+  onNotify: (message, {isError = false}) {
+    showMyToast(message, error: isError);
+  },
+  editorTheme: PaeEditorTheme(
+    borderRadius: 12,
+    borderColor: Colors.black26,
+    snackBarBehavior: SnackBarBehavior.floating,
+    snackBarDuration: Duration(seconds: 2),
+    snackBarBackgroundColor: Color(0xFF1E293B),
+    copyFormattedColor: Colors.indigo,
+  ),
+  editorLabels: const PaeEditorLabels(
+    contentLabel: 'Body',
+    pastedWithFormatting: 'Paste OK',
+    cannotFormatFormula: 'LaTeX can’t be bolded — edit the formula instead',
+  ),
+  mathTheme: PaeMathTheme(
+    seedColor: Colors.teal,
+    dialogBorderRadius: 16,
+    dialogMaxWidth: 640,
+    keyboardHeight: 280,
+  ),
+  mathLabels: const PaeMathLabels(
+    title: 'Equations',
+    openLatexEditor: 'Open equation editor',
+  ),
+);
+```
+
+App-wide:
+
+```dart
+MaterialApp(
+  theme: ThemeData(
+    extensions: const [
+      PaeEditorTheme(seedColor: Colors.indigo),
+      PaeMathTheme(seedColor: Colors.teal),
+    ],
+  ),
 );
 ```
 
@@ -123,10 +191,19 @@ or for one editor, together with your own texts:
 ```dart
 PaeEditor(
   controller: controller,
-  mathTheme: const PaeMathTheme(
-    headerColor: Color(0xFF1E3A8A),
+  mathTheme: PaeMathTheme(
+    headerColor: const Color(0xFF1E3A8A),
     headerForegroundColor: Colors.white,
     keyboardHeight: 320,
+    // Dialog shape / chrome
+    dialogBorderRadius: 16,
+    dialogElevation: 12,
+    dialogMaxWidth: 640,
+    dialogShape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: const BorderSide(color: Color(0x22000000)),
+    ),
+    showHeaderIcon: true,
   ),
   mathLabels: const PaeMathLabels(
     title: 'Equations',
@@ -135,9 +212,10 @@ PaeEditor(
 );
 ```
 
-Every color, radius and size is optional; unset values fall back to the
-theme. The screenshot above uses exactly this navy header and the
-`'Equations'` title.
+Every color, radius, shape and size is optional; unset values fall back to
+the theme. Prefer `dialogShape` for full control (corners, border); or set
+`dialogBorderRadius` / `dialogBorderSide` alone. The screenshot above uses
+exactly this navy header and the `'Equations'` title.
 
 ## Math without the editor
 

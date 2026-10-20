@@ -4,7 +4,6 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:html/dom.dart' as dom;
 import 'package:paste_anything/paste_anything.dart';
 
-
 /// Renders a LaTeX formula; shows the raw LaTeX in red if it doesn't parse.
 class PaeMathView extends StatelessWidget {
   const PaeMathView(
@@ -42,5 +41,10 @@ class PaeMathView extends StatelessWidget {
 Widget? paeMathHtmlBuilder(dom.Element element) {
   final latex = PaeMath.latexOf(element);
   if (latex == null) return null;
-  return InlineCustomWidget(child: PaeMathView(latex));
+  return InlineCustomWidget(
+    child: PaeMathView(
+      latex,
+      display: PaeMath.isDisplay(element),
+    ),
+  );
 }

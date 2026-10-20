@@ -1,4 +1,29 @@
+## 0.4.1
+
+- **Math default theme:** when no `seedColor` / `colorScheme` is set, math UI
+  uses a teal seed (`PaeMathTheme.defaultSeedColor`) so the keyboard and
+  dialog match the standalone dialog look out of the box.
+- **Editor theming:** `PaeEditorTheme` / `PaeEditorLabels` for border, copy /
+  paste row, snackbar chrome and all toast strings; `onNotify` still replaces
+  SnackBars entirely.
+- **LaTeX formatting guard:** toolbar bold / size / font on a selected formula
+  is blocked and shows a toast (`cannotFormatFormula`).
+- **Display math:** `$$…$$` / `\[…\]` keep a display flag through HTML ↔ Delta;
+  embeds render with `MathStyle.display` when flagged.
+- **Wider `$…$` detection** (still skips currency like `$5`); matrix templates
+  for `pmatrix` / `bmatrix` / `vmatrix`.
+- **Dialog polish:** segmented tabs, clearer formula layout; shape knobs
+  (`dialogShape`, `dialogBorderSide`, header icon, etc.).
+- **Fix:** deactivated-ancestor assert when closing the standalone math dialog
+  (safe `FocusNode` dispose + pop on next frame).
+  Also: formula-only LaTeX editor no longer creates a [TabController] in
+  `dispose` (lazy `late final` was the real crash).
+- Example: one shared `PaeMathTheme` for the editor and the standalone dialog.
+- Image paste remains **opt-in** via `PaeEditorController(allowImagePaste: true)`
+  (default embeds as `data:` URIs; optional `onImagePaste` upload).
+
 ## 0.4.0
+
 
 - The copy-paste logic moved to a new pure Dart package,
   [paste_anything](https://pub.dev/packages/paste_anything), for teams with
